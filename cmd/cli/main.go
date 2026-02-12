@@ -2,23 +2,32 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log/slog"
 	"os"
 
+	"vinr.eu/vanguard/internal/code"
 	"vinr.eu/vanguard/internal/loader"
 )
 
 func main() {
 	dirPath := flag.String("dir", "./manifests", "Path to the directory containing JSON manifests")
-
 	debug := flag.Bool("debug", false, "Enable debug logging")
+	tokenFlag := flag.String("github-token", "", "GitHub access token")
 
 	flag.Parse()
 
 	logLevel := slog.LevelInfo
 	if *debug {
 		logLevel = slog.LevelDebug
+	}
+
+	githubToken := *tokenFlag
+	if githubToken == "" {
+		githubToken = os.Getenv("GITHUB_TOKEN")
+	}
+	if githubToken == "" {
+		slog.Warn("no GitHub token provided")
+		os.Exit(1)
 	}
 
 	opts := &slog.HandlerOptions{Level: logLevel}
@@ -38,8 +47,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("\n--- Loaded %d Services ---\n", len(store.Services))
 	for _, svc := range store.Services {
-		fmt.Printf("- %s (Port: %d)\n", svc.Name, svc.Port)
+		err := code.Checkout(svc.GitHubURL, githubToken, "/tmp/"+svc.Name)
+		if err != nil {
+			slog.Error("failed to checkout service", "service", svc.Name, "error", err)
+			os.Exit(1)
+		}
 	}
 }
