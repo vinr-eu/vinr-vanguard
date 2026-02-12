@@ -1,0 +1,46 @@
+name: Release CLI
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build binaries
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Build Linux
+        run: |
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/vanguard-linux-amd64 ./cmd/cli
+
+      - name: Build Windows
+        run: |
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/vanguard-windows-amd64.exe ./cmd/cli
+
+      - name: Build Mac (ARM64)
+        run: |
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/vanguard-darwin-arm64 ./cmd/cli
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            bin/vanguard-linux-amd64
+            bin/vanguard-windows-amd64.exe
+            bin/vanguard-darwin-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
