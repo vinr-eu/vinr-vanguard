@@ -17,7 +17,7 @@ func InitLogger() {
 
 func Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set("app", "uber")
+		c.Set("app", "server")
 		c.Next()
 	}
 }
