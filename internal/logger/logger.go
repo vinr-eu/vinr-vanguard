@@ -8,10 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type ctxKey string
-
-const logInfoKey ctxKey = "gin_metadata"
-
 func InitLogger() {
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -21,13 +17,7 @@ func InitLogger() {
 
 func Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		attrs := []any{
-			slog.String("ip", c.ClientIP()),
-			slog.String("method", c.Request.Method),
-			slog.String("path", c.Request.URL.Path),
-		}
-		ctx := context.WithValue(c.Request.Context(), logInfoKey, attrs)
-		c.Request = c.Request.WithContext(ctx)
+		c.Set("app", "uber")
 		c.Next()
 	}
 }
@@ -37,8 +27,16 @@ func logBase(ctx context.Context, level slog.Level, msg string, args ...any) {
 	if !l.Enabled(ctx, level) {
 		return
 	}
-	if attrs, ok := ctx.Value(logInfoKey).([]any); ok {
-		args = append(args, attrs...)
+	app, ok := ctx.Value("app").(string)
+	if !ok {
+		if gc, isGin := ctx.(*gin.Context); isGin {
+			if val, exists := gc.Get("app"); exists {
+				app, ok = val.(string)
+			}
+		}
+	}
+	if ok {
+		l = l.With("app", app)
 	}
 	l.Log(ctx, level, msg, args...)
 }

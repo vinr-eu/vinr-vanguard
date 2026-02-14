@@ -12,7 +12,7 @@ import (
 )
 
 func Checkout(ctx context.Context, repoURL, accessToken, destPath string) error {
-	logger.Info(ctx, "cloning repository", "url", repoURL, "destination", destPath)
+	logger.Info(ctx, "Cloning repository", "url", repoURL, "destination", destPath)
 
 	auth := &http.BasicAuth{
 		Username: "git",
@@ -29,12 +29,12 @@ func Checkout(ctx context.Context, repoURL, accessToken, destPath string) error 
 	_, err := git.PlainClone(destPath, false, cloneOptions)
 	if err != nil {
 		if errors.Is(err, git.ErrRepositoryAlreadyExists) {
-			logger.Warn(ctx, "repository already exists, skipping clone", "path", destPath)
+			logger.Warn(ctx, "Repository already exists, skipping clone", "path", destPath)
 			return nil
 		}
 		return fmt.Errorf("failed to clone repository: %w", err)
 	}
 
-	logger.Info(ctx, "repository cloned successfully")
+	logger.Info(ctx, "Repository cloned successfully")
 	return nil
 }

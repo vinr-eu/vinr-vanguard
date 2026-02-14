@@ -10,7 +10,7 @@ import (
 )
 
 func Decode(ctx context.Context, data []byte) (interface{}, error) {
-	logger.Debug(ctx, "starting decode", "size_bytes", len(data))
+	logger.Debug(ctx, "Starting decode", "size_bytes", len(data))
 	var header v1.TypeMeta
 	if err := json.Unmarshal(data, &header); err != nil {
 		logger.Error(ctx, "Failed to parse json header", "error", err)
@@ -25,11 +25,11 @@ func Decode(ctx context.Context, data []byte) (interface{}, error) {
 			return nil, fmt.Errorf("invalid Service: %w", err)
 		}
 
-		logger.Info(ctx, "successfully decoded resource", "name", svc.Name)
+		logger.Info(ctx, "Successfully decoded resource", "name", svc.Name)
 		return &svc, nil
 
 	default:
-		logger.Warn(ctx, "unknown resource kind encountered")
+		logger.Warn(ctx, "Unknown resource kind encountered")
 		return nil, fmt.Errorf("unknown kind: %s", header.Kind)
 	}
 }

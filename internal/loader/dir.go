@@ -33,23 +33,23 @@ func LoadDir(ctx context.Context, path string) (*Store, error) {
 		fullPath := filepath.Join(path, entry.Name())
 		data, err := os.ReadFile(fullPath)
 		if err != nil {
-			logger.Warn(ctx, "failed to read file", "path", fullPath, "error", err)
+			logger.Warn(ctx, "Failed to read file", "path", fullPath, "error", err)
 			continue
 		}
 
 		obj, err := serializer.Decode(ctx, data)
 		if err != nil {
-			logger.Debug(ctx, "ignoring file", "file", entry.Name(), "reason", err)
+			logger.Debug(ctx, "Ignoring file", "file", entry.Name(), "reason", err)
 			continue
 		}
 
 		switch o := obj.(type) {
 		case *v1.Service:
 			store.Services = append(store.Services, *o)
-			logger.Info(ctx, "loaded resource", "kind", "Service", "name", o.Name, "file", entry.Name())
+			logger.Info(ctx, "Loaded resource", "kind", "Service", "name", o.Name, "file", entry.Name())
 
 		default:
-			logger.Warn(ctx, "loaded unknown object type", "file", entry.Name())
+			logger.Warn(ctx, "Loaded unknown object type", "file", entry.Name())
 		}
 	}
 

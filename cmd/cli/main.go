@@ -12,7 +12,7 @@ import (
 
 func main() {
 	logger.InitLogger()
-	ctx := context.Background()
+	ctx := context.WithValue(context.Background(), "app", "cli")
 
 	dirPath := flag.String("dir", "./manifests", "Path to the directory containing JSON manifests")
 	tokenFlag := flag.String("github-token", "", "GitHub access token")
@@ -24,7 +24,7 @@ func main() {
 		githubToken = os.Getenv("GITHUB_TOKEN")
 	}
 	if githubToken == "" {
-		logger.Warn(ctx, "no GitHub token provided")
+		logger.Warn(ctx, "No GitHub token provided")
 		os.Exit(1)
 	}
 
@@ -33,7 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Info(ctx, "starting loader", "directory", *dirPath)
+	logger.Info(ctx, "Starting loader", "directory", *dirPath)
 
 	store, err := loader.LoadDir(ctx, *dirPath)
 	if err != nil {
