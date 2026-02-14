@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"vinr.eu/vanguard/api/v1"
+	"vinr.eu/vanguard/defs/v1"
 	"vinr.eu/vanguard/internal/serializer"
 )
 

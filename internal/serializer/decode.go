@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog" // Standard library structured logger
 
-	"vinr.eu/vanguard/api/v1"
+	"vinr.eu/vanguard/defs/v1"
 )
 
 // Decode takes raw bytes and returns a specific struct (Service, Secret, etc.)
