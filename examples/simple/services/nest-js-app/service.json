@@ -1,0 +1,7 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1",
+  "name": "nest-js-app",
+  "gitHubUrl": "https://github.com/vinr/nest-js-app",
+  "runScript": "npm run start"
+}

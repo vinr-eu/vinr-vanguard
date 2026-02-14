@@ -19,6 +19,12 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
+// GetGitHubAccessTokenResponse defines model for GetGitHubAccessTokenResponse.
+type GetGitHubAccessTokenResponse struct {
+	// AccessToken The GitHub access token
+	AccessToken string `json:"accessToken"`
+}
+
 // PingResponse defines model for PingResponse.
 type PingResponse struct {
 	// Status The current health status of Citadel
@@ -33,6 +39,9 @@ type PingResponse struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Retrieve a GitHub access token
+	// (GET /github/access-token)
+	GetGitHubAccessToken(c *gin.Context)
 	// Check Citadel connectivity
 	// (GET /ping)
 	Ping(c *gin.Context)
@@ -46,6 +55,21 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(c *gin.Context)
+
+// GetGitHubAccessToken operation middleware
+func (siw *ServerInterfaceWrapper) GetGitHubAccessToken(c *gin.Context) {
+
+	c.Set(ApiKeyAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetGitHubAccessToken(c)
+}
 
 // Ping operation middleware
 func (siw *ServerInterfaceWrapper) Ping(c *gin.Context) {
@@ -89,5 +113,6 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
+	router.GET(options.BaseURL+"/github/access-token", wrapper.GetGitHubAccessToken)
 	router.GET(options.BaseURL+"/ping", wrapper.Ping)
 }

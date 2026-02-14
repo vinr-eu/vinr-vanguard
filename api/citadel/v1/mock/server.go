@@ -29,6 +29,14 @@ func (s Server) Ping(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, resp)
 }
 
+func (s Server) GetGitHubAccessToken(ctx *gin.Context) {
+	accessToken := os.Getenv("GITHUB_ACCESS_TOKEN")
+	resp := GetGitHubAccessTokenResponse{
+		AccessToken: accessToken,
+	}
+	ctx.JSON(http.StatusOK, resp)
+}
+
 func main() {
 	router := gin.Default()
 	server := NewServer()

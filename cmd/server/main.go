@@ -26,6 +26,20 @@ func main() {
 	router := gin.Default()
 	router.Use(logger.Middleware())
 
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "development"
+	}
+	envDefsGitHubUrl := os.Getenv("ENV_DEFS_GITHUB_URL")
+	envDefsDir := os.Getenv("ENV_DEFS_DIR")
+	if env != "development" && envDefsGitHubUrl == "" {
+		logger.Error(ctx, "Production mode requires ENV_DEFS_GITHUB_URL to be set")
+		os.Exit(1)
+	} else if env == "development" && envDefsGitHubUrl == "" && envDefsDir == "" {
+		logger.Error(ctx, "Development mode requires either ENV_DEFS_GITHUB_URL or ENV_DEFS_DIR to be set")
+		os.Exit(1)
+	}
+
 	citadelUrl, err := url.Parse("http://localhost:9080")
 	if err != nil {
 		logger.Error(ctx, "Failed to parse upstream URL", "error", err)

@@ -16,6 +16,37 @@
     }
   ],
   "paths": {
+    "/github/access-token": {
+      "get": {
+        "tags": [
+          "GitHub"
+        ],
+        "summary": "Retrieve a GitHub access token",
+        "operationId": "GetGitHubAccessToken",
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved GitHub access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetGitHubAccessTokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ping": {
       "get": {
         "summary": "Check Citadel connectivity",
@@ -55,6 +86,18 @@
       }
     },
     "schemas": {
+      "GetGitHubAccessTokenResponse": {
+        "type": "object",
+        "required": [
+          "accessToken"
+        ],
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "The GitHub access token"
+          }
+        }
+      },
       "PingResponse": {
         "type": "object",
         "required": [

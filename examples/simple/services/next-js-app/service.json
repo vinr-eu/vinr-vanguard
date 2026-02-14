@@ -1,0 +1,7 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1",
+  "name": "next-js-app",
+  "gitHubUrl": "https://github.com/vinr/next-js-app",
+  "runScript": "npm run dev"
+}

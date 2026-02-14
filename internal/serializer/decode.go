@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"vinr.eu/vanguard/defs/v1"
+	"vinr.eu/vanguard/internal/defs/v1"
 	"vinr.eu/vanguard/internal/logger"
 )
 
@@ -27,6 +27,16 @@ func Decode(ctx context.Context, data []byte) (interface{}, error) {
 
 		logger.Info(ctx, "Successfully decoded resource", "name", svc.Name)
 		return &svc, nil
+
+	case "Environment":
+		var env v1.Environment
+		if err := json.Unmarshal(data, &env); err != nil {
+			logger.Error(ctx, "Failed to unmarshal environment body", "error", err)
+			return nil, fmt.Errorf("invalid Environment: %w", err)
+		}
+
+		logger.Info(ctx, "Successfully decoded resource", "name", env.Name)
+		return &env, nil
 
 	default:
 		logger.Warn(ctx, "Unknown resource kind encountered")

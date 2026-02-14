@@ -1,0 +1,42 @@
+package v1
+
+type TypeMeta struct {
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+}
+
+type ObjectMeta struct {
+	Name string `json:"name"`
+}
+
+type Service struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:",inline"`
+
+	GitHubURL   string     `json:"gitHubUrl"`
+	Branch      *string    `json:"branch,omitempty"`
+	Path        *string    `json:"path,omitempty"`
+	RunScript   string     `json:"runScript"`
+	IngressHost *string    `json:"ingressHost,omitempty"`
+	Variables   []Variable `json:"variables,omitempty"`
+}
+
+type Variable struct {
+	Name          string  `json:"name"`
+	Value         *string `json:"value,omitempty"`
+	Ref           *string `json:"ref,omitempty"`
+	RefExpression *string `json:"refExpression,omitempty"`
+}
+
+type Environment struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:",inline"`
+
+	Imports   []string                   `json:"imports"`
+	Overrides map[string]ServiceOverride `json:"overrides,omitempty"`
+}
+
+type ServiceOverride struct {
+	Branch    *string    `json:"branch,omitempty"`
+	Variables []Variable `json:"variables,omitempty"`
+}
