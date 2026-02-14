@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -23,6 +25,19 @@ func main() {
 	}
 	router := gin.Default()
 	router.Use(logger.Middleware())
+
+	citadelUrl, err := url.Parse("http://localhost:9080")
+	if err != nil {
+		logger.Error(ctx, "Failed to parse upstream URL", "error", err)
+		os.Exit(1)
+	}
+	citadelService := httputil.NewSingleHostReverseProxy(citadelUrl)
+
+	router.Any("/citadel/*any", func(c *gin.Context) {
+		c.Request.URL.Path = c.Param("any")
+		citadelService.ServeHTTP(c.Writer, c.Request)
+	})
+
 	srv := &http.Server{
 		Handler: router,
 		Addr:    "0.0.0.0:8080",
