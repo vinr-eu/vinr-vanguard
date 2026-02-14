@@ -1,0 +1,8 @@
+{
+  "package": "main",
+  "generate": {
+    "gin-server": true,
+    "models": true
+  },
+  "output": "mock/server.gen.go"
+}

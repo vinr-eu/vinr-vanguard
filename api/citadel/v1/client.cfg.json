@@ -1,0 +1,8 @@
+{
+  "package": "v1",
+  "generate": {
+    "client": true,
+    "models": false
+  },
+  "output": "client.gen.go"
+}

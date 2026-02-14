@@ -1,0 +1,106 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Citadel API",
+    "description": "The command and control interface for Vinr Vanguard agents.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Vinr support team",
+      "email": "technology@vinr.eu"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://citadel.vinr.ai/api/v1",
+      "description": "Production"
+    }
+  ],
+  "paths": {
+    "/ping": {
+      "get": {
+        "summary": "Check Citadel connectivity",
+        "operationId": "Ping",
+        "responses": {
+          "200": {
+            "description": "Successful connectivity check",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "Vanguard agents must provide a valid API key."
+      }
+    },
+    "schemas": {
+      "PingResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "timestamp"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok",
+            "description": "The current health status of Citadel"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The server time when the ping was processed"
+          },
+          "version": {
+            "type": "string",
+            "example": "v1.0.0",
+            "description": "The running version of the Citadel control plane"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 401
+          },
+          "message": {
+            "type": "string",
+            "example": "Invalid enrollment key provided"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ]
+}

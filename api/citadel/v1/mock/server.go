@@ -11,31 +11,39 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"vinr.eu/vanguard/internal/state"
 )
 
-func main() {
-	if err := state.InitCitadel("http://localhost:9080", 5*time.Second); err != nil {
-		log.Fatalf("Failed to init state: %v", err)
+type Server struct{}
+
+func NewServer() Server {
+	return Server{}
+}
+
+func (s Server) Ping(ctx *gin.Context) {
+	version := "1.0.0"
+	resp := PingResponse{
+		Status:    "ok",
+		Timestamp: time.Now(),
+		Version:   &version,
 	}
+	ctx.JSON(http.StatusOK, resp)
+}
+
+func main() {
 	router := gin.Default()
+	server := NewServer()
+	RegisterHandlers(router, server)
 	srv := &http.Server{
 		Handler: router,
-		Addr:    "0.0.0.0:8080",
+		Addr:    "0.0.0.0:9080",
 	}
 	go func() {
-		// service connections
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
 
-	// Wait for the interrupt signal to gracefully shut down the server with
-	// a timeout of 5 seconds.
 	quit := make(chan os.Signal, 1)
-	// kill (no params) by default sends syscall.SIGTERM
-	// kill -2 is syscall.SIGINT
-	// kill -9 is syscall.SIGKILL but can't be caught, so don't need to add it
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutdown Server ...")
