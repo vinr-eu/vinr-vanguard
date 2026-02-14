@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,39 +10,39 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"vinr.eu/vanguard/internal/logger"
 	"vinr.eu/vanguard/internal/state"
 )
 
 func main() {
-	if err := state.InitCitadel("http://localhost:9080", 5*time.Second); err != nil {
-		log.Fatalf("Failed to init state: %v", err)
+	logger.InitLogger()
+	ctx := context.Background()
+	if err := state.InitCitadel(5 * time.Second); err != nil {
+		logger.Error(ctx, "Failed to init state", "error", err)
+		os.Exit(1)
 	}
 	router := gin.Default()
+	router.Use(logger.Middleware())
 	srv := &http.Server{
 		Handler: router,
 		Addr:    "0.0.0.0:8080",
 	}
 	go func() {
-		// service connections
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("listen: %s\n", err)
+			logger.Error(ctx, "Failed to listen", "error", err)
+			os.Exit(1)
 		}
 	}()
 
-	// Wait for the interrupt signal to gracefully shut down the server with
-	// a timeout of 5 seconds.
 	quit := make(chan os.Signal, 1)
-	// kill (no params) by default sends syscall.SIGTERM
-	// kill -2 is syscall.SIGINT
-	// kill -9 is syscall.SIGKILL but can't be caught, so don't need to add it
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutdown Server ...")
+	logger.Info(ctx, "Shutdown Server ...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Println("Server Shutdown:", err)
+		logger.Error(ctx, "Failed to shutdown server", "error", err)
 	}
-	log.Println("Server exiting")
+	logger.Info(ctx, "Server exiting")
 }

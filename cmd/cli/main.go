@@ -1,56 +1,50 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"log/slog"
 	"os"
 
 	"vinr.eu/vanguard/internal/code"
 	"vinr.eu/vanguard/internal/loader"
+	"vinr.eu/vanguard/internal/logger"
 )
 
 func main() {
+	logger.InitLogger()
+	ctx := context.Background()
+
 	dirPath := flag.String("dir", "./manifests", "Path to the directory containing JSON manifests")
-	debug := flag.Bool("debug", false, "Enable debug logging")
 	tokenFlag := flag.String("github-token", "", "GitHub access token")
 
 	flag.Parse()
-
-	logLevel := slog.LevelInfo
-	if *debug {
-		logLevel = slog.LevelDebug
-	}
 
 	githubToken := *tokenFlag
 	if githubToken == "" {
 		githubToken = os.Getenv("GITHUB_TOKEN")
 	}
 	if githubToken == "" {
-		slog.Warn("no GitHub token provided")
+		logger.Warn(ctx, "no GitHub token provided")
 		os.Exit(1)
 	}
-
-	opts := &slog.HandlerOptions{Level: logLevel}
-	logger := slog.New(slog.NewTextHandler(os.Stdout, opts))
-	slog.SetDefault(logger)
 
 	if info, err := os.Stat(*dirPath); err != nil || !info.IsDir() {
-		slog.Error("invalid directory path", "path", *dirPath)
+		logger.Error(ctx, "Invalid directory path", "path", *dirPath)
 		os.Exit(1)
 	}
 
-	slog.Info("starting loader", "directory", *dirPath)
+	logger.Info(ctx, "starting loader", "directory", *dirPath)
 
-	store, err := loader.LoadDir(*dirPath)
+	store, err := loader.LoadDir(ctx, *dirPath)
 	if err != nil {
-		slog.Error("fatal error loading directory", "error", err)
+		logger.Error(ctx, "Fatal error loading directory", "error", err)
 		os.Exit(1)
 	}
 
 	for _, svc := range store.Services {
-		err := code.Checkout(svc.GitHubURL, githubToken, "/tmp/"+svc.Name)
+		err := code.Checkout(ctx, svc.GitHubURL, githubToken, "/tmp/"+svc.Name)
 		if err != nil {
-			slog.Error("failed to checkout service", "service", svc.Name, "error", err)
+			logger.Error(ctx, "Failed to checkout service", "service", svc.Name, "error", err)
 			os.Exit(1)
 		}
 	}

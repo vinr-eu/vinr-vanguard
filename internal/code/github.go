@@ -1,19 +1,18 @@
 package code
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"vinr.eu/vanguard/internal/logger"
 )
 
-// Checkout clones a repository to a specific destination using an access token.
-// It uses a 'shallow clone' (depth=1) for speed since we likely don't need the full history.
-func Checkout(repoURL, accessToken, destPath string) error {
-	slog.Info("cloning repository", "url", repoURL, "destination", destPath)
+func Checkout(ctx context.Context, repoURL, accessToken, destPath string) error {
+	logger.Info(ctx, "cloning repository", "url", repoURL, "destination", destPath)
 
 	auth := &http.BasicAuth{
 		Username: "git",
@@ -27,16 +26,15 @@ func Checkout(repoURL, accessToken, destPath string) error {
 		Depth:    1,
 	}
 
-	// PlainClone downloads the repo into a directory that is NOT a git repo itself
 	_, err := git.PlainClone(destPath, false, cloneOptions)
 	if err != nil {
 		if errors.Is(err, git.ErrRepositoryAlreadyExists) {
-			slog.Warn("repository already exists, skipping clone", "path", destPath)
+			logger.Warn(ctx, "repository already exists, skipping clone", "path", destPath)
 			return nil
 		}
 		return fmt.Errorf("failed to clone repository: %w", err)
 	}
 
-	slog.Info("repository cloned successfully")
+	logger.Info(ctx, "repository cloned successfully")
 	return nil
 }

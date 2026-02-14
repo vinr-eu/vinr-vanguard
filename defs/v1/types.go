@@ -9,7 +9,6 @@ type ObjectMeta struct {
 	Name string `json:"name"`
 }
 
-// Service Definition
 type Service struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:",inline"`
