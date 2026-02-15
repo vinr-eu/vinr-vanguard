@@ -57,6 +57,13 @@ func (c *Config) applyDefaultsAndValidate() error {
 	return nil
 }
 
+func (c *Config) String() string {
+	return fmt.Sprintf(
+		"Mode=%s CitadelURL=%s GitHubURL=%s APIKey=[REDACTED]",
+		c.Mode, c.CitadelURL, c.EnvDefsGitHubURL,
+	)
+}
+
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value

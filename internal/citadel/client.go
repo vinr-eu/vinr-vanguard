@@ -88,6 +88,10 @@ func (c *Client) Ping(ctx context.Context) error {
 	})
 }
 
+func (c *Client) String() string {
+	return "citadel.Client{redacted}"
+}
+
 type statusCoder interface {
 	StatusCode() int
 }
