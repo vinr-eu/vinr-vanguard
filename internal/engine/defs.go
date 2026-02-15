@@ -1,14 +1,15 @@
-package loader
+package engine
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"vinr.eu/vanguard/internal/defs/v1"
 	"vinr.eu/vanguard/internal/logger"
-	"vinr.eu/vanguard/internal/serializer"
 )
 
 type Store struct {
@@ -38,7 +39,7 @@ func LoadDir(ctx context.Context, path string) (*Store, error) {
 			continue
 		}
 
-		obj, err := serializer.Decode(ctx, data)
+		obj, err := decode(ctx, data)
 		if err != nil {
 			logger.Debug(ctx, "Ignoring file", "file", entry.Name(), "reason", err)
 			continue
@@ -100,7 +101,7 @@ func loadImport(ctx context.Context, store *Store, path string) error {
 			continue
 		}
 
-		obj, err := serializer.Decode(ctx, data)
+		obj, err := decode(ctx, data)
 		if err != nil {
 			continue
 		}
@@ -133,5 +134,40 @@ func applyOverride(svc *v1.Service, override v1.ServiceOverride) {
 				svc.Variables = append(svc.Variables, v)
 			}
 		}
+	}
+}
+
+func decode(ctx context.Context, data []byte) (interface{}, error) {
+	logger.Debug(ctx, "Starting decode", "size_bytes", len(data))
+	var header v1.TypeMeta
+	if err := json.Unmarshal(data, &header); err != nil {
+		logger.Error(ctx, "Failed to parse json header", "error", err)
+		return nil, fmt.Errorf("could not parse header: %w", err)
+	}
+
+	switch header.Kind {
+	case "Service":
+		var svc v1.Service
+		if err := json.Unmarshal(data, &svc); err != nil {
+			logger.Error(ctx, "Failed to unmarshal service body", "error", err)
+			return nil, fmt.Errorf("invalid Service: %w", err)
+		}
+
+		logger.Info(ctx, "Successfully decoded resource", "name", svc.Name)
+		return &svc, nil
+
+	case "Environment":
+		var env v1.Environment
+		if err := json.Unmarshal(data, &env); err != nil {
+			logger.Error(ctx, "Failed to unmarshal environment body", "error", err)
+			return nil, fmt.Errorf("invalid Environment: %w", err)
+		}
+
+		logger.Info(ctx, "Successfully decoded resource", "name", env.Name)
+		return &env, nil
+
+	default:
+		logger.Warn(ctx, "Unknown resource kind encountered")
+		return nil, fmt.Errorf("unknown kind: %s", header.Kind)
 	}
 }
