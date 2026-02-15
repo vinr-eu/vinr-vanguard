@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -69,6 +67,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	var runners []*loader.ServiceRunner
 	for _, svc := range store.Services {
 		if svc.GitHubURL == "" {
 			continue
@@ -81,20 +80,21 @@ func main() {
 		repoPath := filepath.Join("/tmp/code", repoName)
 		if err := github.Checkout(ctx, svc.GitHubURL, repoPath); err != nil {
 			logger.Warn(ctx, "Failed to checkout service", "service", svc.Name, "error", err)
+			continue
+		}
+
+		runner := loader.NewServiceRunner(svc, repoPath)
+		if err := runner.Install(ctx); err != nil {
+			logger.Error(ctx, "Failed to install dependencies", "service", svc.Name, "error", err)
+			continue
+		}
+
+		if err := runner.Start(ctx); err != nil {
+			logger.Error(ctx, "Failed to start service", "service", svc.Name, "error", err)
+		} else if runner.Cmd != nil {
+			runners = append(runners, runner)
 		}
 	}
-
-	citadelUrl, err := url.Parse("http://localhost:9080")
-	if err != nil {
-		logger.Error(ctx, "Failed to parse upstream URL", "error", err)
-		os.Exit(1)
-	}
-	citadelService := httputil.NewSingleHostReverseProxy(citadelUrl)
-
-	router.Any("/citadel/*any", func(c *gin.Context) {
-		c.Request.URL.Path = c.Param("any")
-		citadelService.ServeHTTP(c.Writer, c.Request)
-	})
 
 	srv := &http.Server{
 		Handler: router,
@@ -112,10 +112,21 @@ func main() {
 	<-quit
 	logger.Info(ctx, "Shutdown Server ...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(ctxShutdown); err != nil {
 		logger.Error(ctx, "Failed to shutdown server", "error", err)
+	}
+
+	for _, r := range runners {
+		if r.Cmd != nil && r.Cmd.Process != nil {
+			logger.Info(ctx, "Stopping service", "name", r.Service.Name)
+			// CommandContext will already kill the process if we cancel the context used to start it,
+			// but we didn't save the cancel func for each runner's Start call.
+			// Actually, Start uses the main ctx, which is Background() in my implementation.
+			// Let's use SIGTERM for clean shutdown of children.
+			r.Cmd.Process.Signal(syscall.SIGTERM)
+		}
 	}
 	logger.Info(ctx, "Server exiting")
 }
