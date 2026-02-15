@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -11,11 +12,10 @@ import (
 	"github.com/go-git/go-git/v5"
 	ghttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"vinr.eu/vanguard/internal/citadel"
-	"vinr.eu/vanguard/internal/logger"
 )
 
 func cloneRepository(ctx context.Context, repoURL, destPath string, client *citadel.Client) error {
-	logger.Info(ctx, "Cloning repository", "url", repoURL, "destination", destPath)
+	slog.Info("Cloning repository", "url", repoURL, "destination", destPath)
 
 	if client == nil {
 		return fmt.Errorf("citadel client is not initialized")
@@ -43,13 +43,13 @@ func cloneRepository(ctx context.Context, repoURL, destPath string, client *cita
 	_, err = git.PlainClone(destPath, false, cloneOptions)
 	if err != nil {
 		if errors.Is(err, git.ErrRepositoryAlreadyExists) {
-			logger.Warn(ctx, "Repository already exists, skipping clone", "path", destPath)
+			slog.Warn("Repository already exists, skipping clone", "path", destPath)
 			return nil
 		}
 		return fmt.Errorf("failed to clone repository: %w", err)
 	}
 
-	logger.Info(ctx, "Repository cloned successfully")
+	slog.Info("Repository cloned successfully")
 	return nil
 }
 

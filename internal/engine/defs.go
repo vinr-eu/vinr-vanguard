@@ -1,15 +1,14 @@
 package engine
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"vinr.eu/vanguard/internal/defs/v1"
-	"vinr.eu/vanguard/internal/logger"
 )
 
 type Store struct {
@@ -17,7 +16,7 @@ type Store struct {
 	Services    map[string]*v1.Service
 }
 
-func LoadDir(ctx context.Context, path string) (*Store, error) {
+func LoadDir(path string) (*Store, error) {
 	store := &Store{
 		Services: make(map[string]*v1.Service),
 	}
@@ -35,48 +34,48 @@ func LoadDir(ctx context.Context, path string) (*Store, error) {
 		fullPath := filepath.Join(path, entry.Name())
 		data, err := os.ReadFile(fullPath)
 		if err != nil {
-			logger.Warn(ctx, "Failed to read file", "path", fullPath, "error", err)
+			slog.Warn("Failed to read file", "path", fullPath, "error", err)
 			continue
 		}
 
-		obj, err := decode(ctx, data)
+		obj, err := decode(data)
 		if err != nil {
-			logger.Debug(ctx, "Ignoring file", "file", entry.Name(), "reason", err)
+			slog.Debug("Ignoring file", "file", entry.Name(), "reason", err)
 			continue
 		}
 
 		switch o := obj.(type) {
 		case *v1.Service:
 			store.Services[o.Name] = o
-			logger.Info(ctx, "Loaded resource", "kind", "Service", "name", o.Name, "file", entry.Name())
+			slog.Info("Loaded resource", "kind", "Service", "name", o.Name, "file", entry.Name())
 
 		case *v1.Environment:
 			if store.Environment != nil {
-				logger.Warn(ctx, "Multiple Environment objects found in directory, using latest", "file", entry.Name())
+				slog.Warn("Multiple Environment objects found in directory, using latest", "file", entry.Name())
 			}
 			store.Environment = o
-			logger.Info(ctx, "Loaded resource", "kind", "Environment", "name", o.Name, "file", entry.Name())
+			slog.Info("Loaded resource", "kind", "Environment", "name", o.Name, "file", entry.Name())
 
 		default:
-			logger.Warn(ctx, "Loaded unknown object type", "file", entry.Name())
+			slog.Warn("Loaded unknown object type", "file", entry.Name())
 		}
 	}
 
 	if store.Environment != nil {
 		for _, imp := range store.Environment.Imports {
 			importPath := filepath.Join(path, imp)
-			err := loadImport(ctx, store, importPath)
+			err := loadImport(store, importPath)
 			if err != nil {
-				logger.Warn(ctx, "Failed to load import", "path", importPath, "error", err)
+				slog.Warn("Failed to load import", "path", importPath, "error", err)
 			}
 		}
 
 		for name, override := range store.Environment.Overrides {
 			if svc, ok := store.Services[name]; ok {
 				applyOverride(svc, override)
-				logger.Info(ctx, "Applied override", "service", name)
+				slog.Info("Applied override", "service", name)
 			} else {
-				logger.Warn(ctx, "Override defined for non-existent service", "service", name)
+				slog.Warn("Override defined for non-existent service", "service", name)
 			}
 		}
 	}
@@ -84,7 +83,7 @@ func LoadDir(ctx context.Context, path string) (*Store, error) {
 	return store, nil
 }
 
-func loadImport(ctx context.Context, store *Store, path string) error {
+func loadImport(store *Store, path string) error {
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return err
@@ -101,14 +100,14 @@ func loadImport(ctx context.Context, store *Store, path string) error {
 			continue
 		}
 
-		obj, err := decode(ctx, data)
+		obj, err := decode(data)
 		if err != nil {
 			continue
 		}
 
 		if svc, ok := obj.(*v1.Service); ok {
 			store.Services[svc.Name] = svc
-			logger.Info(ctx, "Loaded imported service", "name", svc.Name, "path", fullPath)
+			slog.Info("Loaded imported service", "name", svc.Name, "path", fullPath)
 		}
 	}
 
@@ -137,11 +136,11 @@ func applyOverride(svc *v1.Service, override v1.ServiceOverride) {
 	}
 }
 
-func decode(ctx context.Context, data []byte) (interface{}, error) {
-	logger.Debug(ctx, "Starting decode", "size_bytes", len(data))
+func decode(data []byte) (interface{}, error) {
+	slog.Debug("Starting decode", "size_bytes", len(data))
 	var header v1.TypeMeta
 	if err := json.Unmarshal(data, &header); err != nil {
-		logger.Error(ctx, "Failed to parse json header", "error", err)
+		slog.Error("Failed to parse json header", "error", err)
 		return nil, fmt.Errorf("could not parse header: %w", err)
 	}
 
@@ -149,25 +148,25 @@ func decode(ctx context.Context, data []byte) (interface{}, error) {
 	case "Service":
 		var svc v1.Service
 		if err := json.Unmarshal(data, &svc); err != nil {
-			logger.Error(ctx, "Failed to unmarshal service body", "error", err)
+			slog.Error("Failed to unmarshal service body", "error", err)
 			return nil, fmt.Errorf("invalid Service: %w", err)
 		}
 
-		logger.Info(ctx, "Successfully decoded resource", "name", svc.Name)
+		slog.Info("Successfully decoded resource", "name", svc.Name)
 		return &svc, nil
 
 	case "Environment":
 		var env v1.Environment
 		if err := json.Unmarshal(data, &env); err != nil {
-			logger.Error(ctx, "Failed to unmarshal environment body", "error", err)
+			slog.Error("Failed to unmarshal environment body", "error", err)
 			return nil, fmt.Errorf("invalid Environment: %w", err)
 		}
 
-		logger.Info(ctx, "Successfully decoded resource", "name", env.Name)
+		slog.Info("Successfully decoded resource", "name", env.Name)
 		return &env, nil
 
 	default:
-		logger.Warn(ctx, "Unknown resource kind encountered")
+		slog.Warn("Unknown resource kind encountered")
 		return nil, fmt.Errorf("unknown kind: %s", header.Kind)
 	}
 }

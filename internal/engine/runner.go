@@ -5,13 +5,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"vinr.eu/vanguard/internal/defs/v1"
-	"vinr.eu/vanguard/internal/logger"
 )
 
 type ServiceRunner struct {
@@ -42,7 +42,7 @@ func (r *ServiceRunner) Install(ctx context.Context) error {
 		cmdName = "npm"
 	}
 
-	logger.Info(ctx, "Running installation", "service", r.Service.Name, "manager", cmdName)
+	slog.Info("Running installation", "service", r.Service.Name, "manager", cmdName)
 
 	cmd := exec.CommandContext(ctx, cmdName, "install")
 	cmd.Dir = r.Path
@@ -61,20 +61,20 @@ func (r *ServiceRunner) Install(ctx context.Context) error {
 		return fmt.Errorf("failed to start %s install for %s: %w", cmdName, r.Service.Name, err)
 	}
 
-	go r.logPipe(stdout, logger.Info)
-	go r.logPipe(stderr, logger.Error)
+	go r.logPipe(stdout, slog.LevelInfo)
+	go r.logPipe(stderr, slog.LevelError)
 
 	if err := cmd.Wait(); err != nil {
 		return fmt.Errorf("%s install failed for %s: %w", cmdName, r.Service.Name, err)
 	}
 
-	logger.Info(ctx, "Installation completed", "service", r.Service.Name)
+	slog.Info("Installation completed", "service", r.Service.Name)
 	return nil
 }
 
 func (r *ServiceRunner) Start(ctx context.Context) error {
 	if r.Service.RunScript == "" {
-		logger.Info(ctx, "No runScript provided, skipping start", "service", r.Service.Name)
+		slog.Info("No runScript provided, skipping start", "service", r.Service.Name)
 		return nil
 	}
 	args := strings.Fields(r.Service.RunScript)
@@ -105,20 +105,19 @@ func (r *ServiceRunner) Start(ctx context.Context) error {
 
 	r.Cmd = cmd
 
-	go r.logPipe(stdout, logger.Info)
-	go r.logPipe(stderr, logger.Error)
+	go r.logPipe(stdout, slog.LevelInfo)
+	go r.logPipe(stderr, slog.LevelError)
 
-	logger.Info(ctx, "Service started", "name", r.Service.Name, "path", r.Path, "pid", cmd.Process.Pid)
+	slog.Info("Service started", "name", r.Service.Name, "path", r.Path, "pid", cmd.Process.Pid)
 
 	return nil
 }
 
-func (r *ServiceRunner) logPipe(pipe io.ReadCloser, logFunc func(context.Context, string, ...any)) {
-	defer pipe.Close()
-	scanner := bufio.NewScanner(pipe)
-	ctx := context.WithValue(context.Background(), "app", r.Service.Name)
+func (r *ServiceRunner) logPipe(rc io.ReadCloser, level slog.Level) {
+	defer rc.Close()
+	scanner := bufio.NewScanner(rc)
 	for scanner.Scan() {
-		logFunc(ctx, scanner.Text())
+		slog.Log(context.Background(), level, scanner.Text())
 	}
 }
 
