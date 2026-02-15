@@ -63,6 +63,8 @@ func InitCitadel(interval time.Duration) error {
 
 	GlobalCitadel = mgr
 
+	mgr.ping(context.Background())
+
 	go mgr.startPingerLoop(context.Background(), interval)
 
 	return nil
@@ -78,8 +80,6 @@ func GetCitadel() CitadelState {
 func (m *CitadelManager) startPingerLoop(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-
-	m.ping(ctx)
 
 	for {
 		select {

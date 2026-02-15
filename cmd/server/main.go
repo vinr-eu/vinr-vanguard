@@ -8,10 +8,13 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"vinr.eu/vanguard/internal/github"
+	"vinr.eu/vanguard/internal/loader"
 	"vinr.eu/vanguard/internal/logger"
 	"vinr.eu/vanguard/internal/state"
 )
@@ -38,6 +41,47 @@ func main() {
 	} else if env == "development" && envDefsGitHubUrl == "" && envDefsDir == "" {
 		logger.Error(ctx, "Development mode requires either ENV_DEFS_GITHUB_URL or ENV_DEFS_DIR to be set")
 		os.Exit(1)
+	}
+
+	// Clean up code directory before checkouts
+	if err := os.RemoveAll("/tmp/code"); err != nil {
+		logger.Warn(ctx, "Failed to clean up /tmp/code", "error", err)
+	}
+
+	loadPath := envDefsDir
+	if envDefsGitHubUrl != "" {
+		repoName, err := github.GetRepoName(envDefsGitHubUrl)
+		if err != nil {
+			logger.Error(ctx, "Failed to get repo name", "error", err)
+			os.Exit(1)
+		}
+		repoPath := filepath.Join("/tmp/code", repoName)
+		if err := github.Checkout(ctx, envDefsGitHubUrl, repoPath); err != nil {
+			logger.Error(ctx, "Failed to checkout env defs", "error", err)
+			os.Exit(1)
+		}
+		loadPath = filepath.Join(repoPath, envDefsDir)
+	}
+
+	store, err := loader.LoadDir(ctx, loadPath)
+	if err != nil {
+		logger.Error(ctx, "Failed to load directory", "path", loadPath, "error", err)
+		os.Exit(1)
+	}
+
+	for _, svc := range store.Services {
+		if svc.GitHubURL == "" {
+			continue
+		}
+		repoName, err := github.GetRepoName(svc.GitHubURL)
+		if err != nil {
+			logger.Warn(ctx, "Failed to get repo name for service", "service", svc.Name, "error", err)
+			continue
+		}
+		repoPath := filepath.Join("/tmp/code", repoName)
+		if err := github.Checkout(ctx, svc.GitHubURL, repoPath); err != nil {
+			logger.Warn(ctx, "Failed to checkout service", "service", svc.Name, "error", err)
+		}
 	}
 
 	citadelUrl, err := url.Parse("http://localhost:9080")

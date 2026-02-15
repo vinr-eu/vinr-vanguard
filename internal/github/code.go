@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -81,4 +82,13 @@ func Checkout(ctx context.Context, repoURL, destPath string) error {
 
 	logger.Info(ctx, "Repository cloned successfully")
 	return nil
+}
+
+func GetRepoName(repoURL string) (string, error) {
+	repoURL = strings.TrimSuffix(repoURL, ".git")
+	parts := strings.Split(repoURL, "/")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid repository URL: %s", repoURL)
+	}
+	return parts[len(parts)-1], nil
 }
