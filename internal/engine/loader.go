@@ -2,16 +2,16 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"vinr.eu/vanguard/internal/citadel"
 	"vinr.eu/vanguard/internal/config"
-	"vinr.eu/vanguard/internal/github"
 	"vinr.eu/vanguard/internal/logger"
 )
 
-func Boot(ctx context.Context, cfg *config.Config, citadelClient *citadel.Client) {
+func Boot(ctx context.Context, cfg *config.Config, citadelClient *citadel.Client) error {
 	// Clean up the code directory before checkouts
 	if err := os.RemoveAll("/tmp/code"); err != nil {
 		logger.Warn(ctx, "Failed to clean up /tmp/code", "error", err)
@@ -19,23 +19,20 @@ func Boot(ctx context.Context, cfg *config.Config, citadelClient *citadel.Client
 
 	loadPath := cfg.EnvDefsDir
 	if cfg.EnvDefsGitHubURL != "" {
-		repoName, err := github.GetRepoName(cfg.EnvDefsGitHubURL)
+		repoName, err := getRepoName(cfg.EnvDefsGitHubURL)
 		if err != nil {
-			logger.Error(ctx, "Failed to get repo name", "error", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to get repo name: %w", err)
 		}
 		repoPath := filepath.Join("/tmp/code", repoName)
-		if err := github.Checkout(ctx, cfg.EnvDefsGitHubURL, repoPath, citadelClient); err != nil {
-			logger.Error(ctx, "Failed to checkout env defs", "error", err)
-			os.Exit(1)
+		if err := cloneRepository(ctx, cfg.EnvDefsGitHubURL, repoPath, citadelClient); err != nil {
+			return fmt.Errorf("failed to checkout env defs: %w", err)
 		}
 		loadPath = filepath.Join(repoPath, cfg.EnvDefsDir)
 	}
 
 	store, err := LoadDir(ctx, loadPath)
 	if err != nil {
-		logger.Error(ctx, "Failed to load directory", "path", loadPath, "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to load directory %s: %w", loadPath, err)
 	}
 
 	var runners []*ServiceRunner
@@ -43,13 +40,13 @@ func Boot(ctx context.Context, cfg *config.Config, citadelClient *citadel.Client
 		if svc.GitHubURL == "" {
 			continue
 		}
-		repoName, err := github.GetRepoName(svc.GitHubURL)
+		repoName, err := getRepoName(svc.GitHubURL)
 		if err != nil {
 			logger.Warn(ctx, "Failed to get repo name for service", "service", svc.Name, "error", err)
 			continue
 		}
 		repoPath := filepath.Join("/tmp/code", repoName)
-		if err := github.Checkout(ctx, svc.GitHubURL, repoPath, citadelClient); err != nil {
+		if err := cloneRepository(ctx, svc.GitHubURL, repoPath, citadelClient); err != nil {
 			logger.Warn(ctx, "Failed to checkout service", "service", svc.Name, "error", err)
 			continue
 		}
@@ -66,4 +63,5 @@ func Boot(ctx context.Context, cfg *config.Config, citadelClient *citadel.Client
 			runners = append(runners, runner)
 		}
 	}
+	return nil
 }

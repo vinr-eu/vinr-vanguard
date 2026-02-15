@@ -25,13 +25,16 @@ func main() {
 		logger.Error(ctx, "Failed to load config", "error", err)
 		os.Exit(1)
 	}
-	citadelClient, err := citadel.New(ctx, cfg)
+	citadelClient, err := citadel.NewClient(ctx, cfg)
 	if err != nil {
 		logger.Error(ctx, "Failed to init citadel manager", "error", err)
 		os.Exit(1)
 	}
 
-	engine.Boot(ctx, cfg, citadelClient)
+	if err := engine.Boot(ctx, cfg, citadelClient); err != nil {
+		logger.Error(ctx, "Failed to boot engine", "error", err)
+		os.Exit(1)
+	}
 
 	router := gin.Default()
 	router.Use(logger.Middleware())

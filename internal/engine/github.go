@@ -1,4 +1,4 @@
-package github
+package engine
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"vinr.eu/vanguard/internal/logger"
 )
 
-func Checkout(ctx context.Context, repoURL, destPath string, client *citadel.Client) error {
+func cloneRepository(ctx context.Context, repoURL, destPath string, client *citadel.Client) error {
 	logger.Info(ctx, "Cloning repository", "url", repoURL, "destination", destPath)
 
 	if client == nil {
@@ -53,7 +53,7 @@ func Checkout(ctx context.Context, repoURL, destPath string, client *citadel.Cli
 	return nil
 }
 
-func GetRepoName(repoURL string) (string, error) {
+func getRepoName(repoURL string) (string, error) {
 	repoURL = strings.TrimSuffix(repoURL, ".git")
 	parts := strings.Split(repoURL, "/")
 	if len(parts) < 2 {

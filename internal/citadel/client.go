@@ -14,7 +14,7 @@ type Client struct {
 	api *gen.ClientWithResponses
 }
 
-func New(ctx context.Context, cfg *config.Config) (*Client, error) {
+func NewClient(ctx context.Context, cfg *config.Config) (*Client, error) {
 	apiKeyInjector := func(ctx context.Context, req *http.Request) error {
 		req.Header.Set("x-api-key", cfg.CitadelAPIKey)
 		return nil
