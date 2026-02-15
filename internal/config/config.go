@@ -14,40 +14,52 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	mode := os.Getenv("MODE")
-	if mode == "" {
-		mode = "local"
-	}
-	if mode != "local" && mode != "server" {
-		return nil, fmt.Errorf("MODE must be 'local' or 'server', got %q", mode)
-	}
-
-	citadelURL := os.Getenv("CITADEL_URL")
-	citadelAPIKey := os.Getenv("CITADEL_API_KEY")
-
-	if mode == "local" && citadelURL == "" {
-		citadelURL = "http://localhost:9080"
-	}
-	if mode != "local" && citadelURL == "" {
-		return nil, fmt.Errorf("CITADEL_URL must be set in server mode")
-	}
-	if mode != "local" && citadelAPIKey == "" {
-		return nil, fmt.Errorf("CITADEL_API_KEY must be set")
+	cfg := &Config{
+		Mode:             getEnv("MODE", "local"),
+		CitadelURL:       os.Getenv("CITADEL_URL"),
+		CitadelAPIKey:    os.Getenv("CITADEL_API_KEY"),
+		EnvDefsGitHubURL: os.Getenv("ENV_DEFS_GITHUB_URL"),
+		EnvDefsDir:       os.Getenv("ENV_DEFS_DIR"),
 	}
 
-	envDefsGitHubURL := os.Getenv("ENV_DEFS_GITHUB_URL")
-	envDefsDir := os.Getenv("ENV_DEFS_DIR")
-	if mode != "local" && envDefsGitHubURL == "" {
-		return nil, fmt.Errorf("ENV_DEFS_GITHUB_URL must be set in server mode")
-	} else if mode == "local" && envDefsGitHubURL == "" && envDefsDir == "" {
-		return nil, fmt.Errorf("ENV_DEFS_GITHUB_URL or ENV_DEFS_DIR must be set in local mode")
+	if err := cfg.applyDefaultsAndValidate(); err != nil {
+		return nil, err
 	}
 
-	return &Config{
-		Mode:             mode,
-		CitadelURL:       citadelURL,
-		CitadelAPIKey:    citadelAPIKey,
-		EnvDefsGitHubURL: envDefsGitHubURL,
-		EnvDefsDir:       envDefsDir,
-	}, nil
+	return cfg, nil
+}
+
+func (c *Config) applyDefaultsAndValidate() error {
+	if c.Mode != "local" && c.Mode != "server" {
+		return fmt.Errorf("MODE must be 'local' or 'server', got %q", c.Mode)
+	}
+
+	if c.Mode == "local" && c.CitadelURL == "" {
+		c.CitadelURL = "http://localhost:9080"
+	}
+
+	if c.Mode == "server" {
+		if c.CitadelURL == "" {
+			return fmt.Errorf("CITADEL_URL must be set in server mode")
+		}
+		if c.CitadelAPIKey == "" {
+			return fmt.Errorf("CITADEL_API_KEY must be set in server mode")
+		}
+		if c.EnvDefsGitHubURL == "" {
+			return fmt.Errorf("ENV_DEFS_GITHUB_URL must be set in server mode")
+		}
+	}
+
+	if c.Mode == "local" && c.EnvDefsGitHubURL == "" && c.EnvDefsDir == "" {
+		return fmt.Errorf("either ENV_DEFS_GITHUB_URL or ENV_DEFS_DIR must be set in local mode")
+	}
+
+	return nil
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }
