@@ -19,13 +19,15 @@ import (
 func main() {
 	ctx := context.Background()
 
+	// Load config
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("Failed to load config", "error", err)
 		os.Exit(1)
 	}
+
+	// Load Citadel client
 	client, err := citadel.NewClient(
-		ctx,
 		cfg.CitadelURL,
 		citadel.WithAPIKey(cfg.CitadelAPIKey),
 		citadel.WithTimeout(5*time.Second),
@@ -34,20 +36,19 @@ func main() {
 		slog.Error("Failed to init citadel manager", "error", err)
 		os.Exit(1)
 	}
-
 	githubTokenProvider := func(ctx context.Context) (string, error) {
 		return client.GetGithubAccessToken(ctx)
 	}
 
+	// Load environment manager and Boot the environment
 	manager := environment.NewManager(cfg.WorkspaceDir, githubTokenProvider)
-
 	if err := manager.Boot(ctx, cfg.EnvDefsGitURL, cfg.EnvDefsDir); err != nil {
 		slog.Error("Failed to boot engine", "error", err)
 		os.Exit(1)
 	}
 
+	// Set up the reverse proxy
 	router := gin.Default()
-
 	srv := &http.Server{
 		Handler: router,
 		Addr:    "0.0.0.0:8080",
@@ -57,12 +58,10 @@ func main() {
 			slog.Error("Failed to listen", "error", err)
 		}
 	}()
-
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	slog.Info("Shutdown Server ...")
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {

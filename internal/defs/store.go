@@ -58,12 +58,12 @@ func (s *Store) loadFile(path string) error {
 
 	switch o := obj.(type) {
 	case *v1.Service:
-		s.Services[o.Name] = mapServiceV1(o) // Mapping to Internal
+		s.Services[o.Name] = mapServiceV1(o)
 	case *v1.Environment:
 		if s.Environment != nil {
 			return fmt.Errorf("duplicate environment found at %s", path)
 		}
-		s.Environment = mapEnvironmentV1(o) // Mapping to Internal
+		s.Environment = mapEnvironmentV1(o)
 	}
 	return nil
 }

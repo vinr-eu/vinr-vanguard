@@ -61,8 +61,8 @@ func (c *Config) applyDefaultsAndValidate() error {
 
 func (c *Config) String() string {
 	return fmt.Sprintf(
-		"Mode=%s CitadelURL=%s EnvDefsGitURL=%s APIKey=[REDACTED]",
-		c.Mode, c.CitadelURL, c.EnvDefsGitURL,
+		"Mode=%s WorkspaceDir=%s CitadelURL=%s EnvDefsGitURL=%s EnvDefsDir=%s",
+		c.Mode, c.WorkspaceDir, c.CitadelURL, c.EnvDefsGitURL, c.EnvDefsDir,
 	)
 }
 

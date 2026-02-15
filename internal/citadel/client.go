@@ -29,7 +29,7 @@ func WithTimeout(d time.Duration) Option {
 	}
 }
 
-func NewClient(ctx context.Context, baseURL string, opts ...Option) (*Client, error) {
+func NewClient(baseURL string, opts ...Option) (*Client, error) {
 	client := &Client{
 		timeout: 10 * time.Second,
 	}
@@ -57,13 +57,6 @@ func NewClient(ctx context.Context, baseURL string, opts ...Option) (*Client, er
 	}
 
 	client.api = apiClient
-
-	startupCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	if err := client.Ping(startupCtx); err != nil {
-		return nil, fmt.Errorf("citadel startup check failed: %w", err)
-	}
 
 	return client, nil
 }

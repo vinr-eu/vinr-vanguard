@@ -1,17 +1,18 @@
 package defs
 
 type Service struct {
-	Name      string
-	GitURL    string
-	Branch    string
-	Path      string
-	RunScript string
-	Variables []Variable
+	Name        string
+	GitURL      string
+	Branch      string
+	Path        string
+	RunScript   string
+	IngressHost *string
+	Variables   []Variable
 }
 
 type Variable struct {
 	Name  string
-	Value *string
+	Value string
 }
 
 type Environment struct {

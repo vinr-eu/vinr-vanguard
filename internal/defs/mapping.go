@@ -14,12 +14,13 @@ func mapServiceV1(svc *v1.Service) *Service {
 	}
 
 	return &Service{
-		Name:      svc.Name,
-		GitURL:    svc.GitURL,
-		Branch:    branch,
-		Variables: mapVariablesV1(svc.Variables),
-		Path:      path,
-		RunScript: svc.RunScript,
+		Name:        svc.Name,
+		GitURL:      svc.GitURL,
+		Branch:      branch,
+		Path:        path,
+		RunScript:   svc.RunScript,
+		IngressHost: svc.IngressHost,
+		Variables:   mapVariablesV1(svc.Variables),
 	}
 }
 
@@ -44,7 +45,7 @@ func mapVariablesV1(vars []v1.Variable) []Variable {
 	for i, v := range vars {
 		out[i] = Variable{
 			Name:  v.Name,
-			Value: v.Value,
+			Value: *v.Value, //TODO parse secrets and other references to value
 		}
 	}
 	return out

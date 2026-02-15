@@ -82,7 +82,7 @@ func (r *Runner) Start(ctx context.Context) error {
 func (r *Runner) buildEnv() []string {
 	env := os.Environ()
 	for _, v := range r.Service.Variables {
-		env = append(env, fmt.Sprintf("%s=%s", v.Name, *v.Value))
+		env = append(env, fmt.Sprintf("%s=%s", v.Name, v.Value))
 	}
 	return env
 }
