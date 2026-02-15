@@ -25,7 +25,12 @@ func main() {
 		logger.Error(ctx, "Failed to load config", "error", err)
 		os.Exit(1)
 	}
-	citadelClient, err := citadel.NewClient(ctx, cfg)
+	citadelClient, err := citadel.NewClient(
+		ctx,
+		cfg.CitadelURL,
+		citadel.WithAPIKey(cfg.CitadelAPIKey),
+		citadel.WithTimeout(5*time.Second),
+	)
 	if err != nil {
 		logger.Error(ctx, "Failed to init citadel manager", "error", err)
 		os.Exit(1)

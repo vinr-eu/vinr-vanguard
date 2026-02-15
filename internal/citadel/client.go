@@ -7,33 +7,56 @@ import (
 	"time"
 
 	gen "vinr.eu/vanguard/api/citadel/v1"
-	"vinr.eu/vanguard/internal/config"
 )
 
 type Client struct {
-	api *gen.ClientWithResponses
+	api     *gen.ClientWithResponses
+	apiKey  string
+	timeout time.Duration
 }
 
-func NewClient(ctx context.Context, cfg *config.Config) (*Client, error) {
+type Option func(*Client)
+
+func WithAPIKey(key string) Option {
+	return func(c *Client) {
+		c.apiKey = key
+	}
+}
+
+func WithTimeout(d time.Duration) Option {
+	return func(c *Client) {
+		c.timeout = d
+	}
+}
+
+func NewClient(ctx context.Context, baseURL string, opts ...Option) (*Client, error) {
+	client := &Client{
+		timeout: 10 * time.Second,
+	}
+
+	for _, opt := range opts {
+		opt(client)
+	}
+
 	apiKeyInjector := func(ctx context.Context, req *http.Request) error {
-		req.Header.Set("x-api-key", cfg.CitadelAPIKey)
+		if client.apiKey != "" {
+			req.Header.Set("x-api-key", client.apiKey)
+		}
 		return nil
 	}
 
 	apiClient, err := gen.NewClientWithResponses(
-		cfg.CitadelURL,
+		baseURL,
 		gen.WithRequestEditorFn(apiKeyInjector),
 		gen.WithHTTPClient(&http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: client.timeout,
 		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create citadel client: %w", err)
 	}
 
-	client := &Client{
-		api: apiClient,
-	}
+	client.api = apiClient
 
 	startupCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
