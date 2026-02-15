@@ -2,7 +2,7 @@
   "package": "v1",
   "generate": {
     "client": true,
-    "models": false
+    "models": true
   },
   "output": "client.gen.go"
 }

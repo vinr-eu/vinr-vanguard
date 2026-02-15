@@ -95,7 +95,7 @@ func (m *CitadelManager) ping(ctx context.Context) {
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	resp, err := m.client.PingWithResponse(pingCtx)
+	resp, err := m.client.GetPingWithResponse(pingCtx)
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -111,7 +111,7 @@ func (m *CitadelManager) ping(ctx context.Context) {
 
 	if resp.JSON200 != nil {
 		m.state.IsAlive = true
-		status := resp.JSON200.Status()
+		status := resp.JSON200.Status
 		m.state.Message = status
 	} else {
 		m.state.IsAlive = false

@@ -11,7 +11,36 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
+
+const (
+	ApiKeyAuthScopes = "ApiKeyAuth.Scopes"
+)
+
+// ErrorResponse defines model for ErrorResponse.
+type ErrorResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+// GetGitHubAccessTokenResponse defines model for GetGitHubAccessTokenResponse.
+type GetGitHubAccessTokenResponse struct {
+	// AccessToken The GitHub access token
+	AccessToken string `json:"accessToken"`
+}
+
+// PingResponse defines model for PingResponse.
+type PingResponse struct {
+	// Status The current health status of Citadel
+	Status string `json:"status"`
+
+	// Timestamp The server time when the ping was processed
+	Timestamp time.Time `json:"timestamp"`
+
+	// Version The running version of the Citadel control plane
+	Version *string `json:"version,omitempty"`
+}
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -86,15 +115,15 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
-	// GetGitHubAccessToken request
-	GetGitHubAccessToken(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetGithubAccessToken request
+	GetGithubAccessToken(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// Ping request
-	Ping(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetPing request
+	GetPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) GetGitHubAccessToken(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetGitHubAccessTokenRequest(c.Server)
+func (c *Client) GetGithubAccessToken(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetGithubAccessTokenRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -105,8 +134,8 @@ func (c *Client) GetGitHubAccessToken(ctx context.Context, reqEditors ...Request
 	return c.Client.Do(req)
 }
 
-func (c *Client) Ping(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPingRequest(c.Server)
+func (c *Client) GetPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPingRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +146,8 @@ func (c *Client) Ping(ctx context.Context, reqEditors ...RequestEditorFn) (*http
 	return c.Client.Do(req)
 }
 
-// NewGetGitHubAccessTokenRequest generates requests for GetGitHubAccessToken
-func NewGetGitHubAccessTokenRequest(server string) (*http.Request, error) {
+// NewGetGithubAccessTokenRequest generates requests for GetGithubAccessToken
+func NewGetGithubAccessTokenRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -144,8 +173,8 @@ func NewGetGitHubAccessTokenRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewPingRequest generates requests for Ping
-func NewPingRequest(server string) (*http.Request, error) {
+// NewGetPingRequest generates requests for GetPing
+func NewGetPingRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -214,14 +243,14 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
-	// GetGitHubAccessTokenWithResponse request
-	GetGitHubAccessTokenWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetGitHubAccessTokenResponse, error)
+	// GetGithubAccessTokenWithResponse request
+	GetGithubAccessTokenWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetGithubAccessTokenResponse, error)
 
-	// PingWithResponse request
-	PingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PingResponse, error)
+	// GetPingWithResponse request
+	GetPingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetPingResponse, error)
 }
 
-type GetGitHubAccessTokenResponse struct {
+type GetGithubAccessTokenResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *GetGitHubAccessTokenResponse
@@ -229,7 +258,7 @@ type GetGitHubAccessTokenResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetGitHubAccessTokenResponse) Status() string {
+func (r GetGithubAccessTokenResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -237,14 +266,14 @@ func (r GetGitHubAccessTokenResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetGitHubAccessTokenResponse) StatusCode() int {
+func (r GetGithubAccessTokenResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PingResponse struct {
+type GetPingResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *PingResponse
@@ -252,7 +281,7 @@ type PingResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PingResponse) Status() string {
+func (r GetPingResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -260,40 +289,40 @@ func (r PingResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PingResponse) StatusCode() int {
+func (r GetPingResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-// GetGitHubAccessTokenWithResponse request returning *GetGitHubAccessTokenResponse
-func (c *ClientWithResponses) GetGitHubAccessTokenWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetGitHubAccessTokenResponse, error) {
-	rsp, err := c.GetGitHubAccessToken(ctx, reqEditors...)
+// GetGithubAccessTokenWithResponse request returning *GetGithubAccessTokenResponse
+func (c *ClientWithResponses) GetGithubAccessTokenWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetGithubAccessTokenResponse, error) {
+	rsp, err := c.GetGithubAccessToken(ctx, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetGitHubAccessTokenResponse(rsp)
+	return ParseGetGithubAccessTokenResponse(rsp)
 }
 
-// PingWithResponse request returning *PingResponse
-func (c *ClientWithResponses) PingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PingResponse, error) {
-	rsp, err := c.Ping(ctx, reqEditors...)
+// GetPingWithResponse request returning *GetPingResponse
+func (c *ClientWithResponses) GetPingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetPingResponse, error) {
+	rsp, err := c.GetPing(ctx, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePingResponse(rsp)
+	return ParseGetPingResponse(rsp)
 }
 
-// ParseGetGitHubAccessTokenResponse parses an HTTP response from a GetGitHubAccessTokenWithResponse call
-func ParseGetGitHubAccessTokenResponse(rsp *http.Response) (*GetGitHubAccessTokenResponse, error) {
+// ParseGetGithubAccessTokenResponse parses an HTTP response from a GetGithubAccessTokenWithResponse call
+func ParseGetGithubAccessTokenResponse(rsp *http.Response) (*GetGithubAccessTokenResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetGitHubAccessTokenResponse{
+	response := &GetGithubAccessTokenResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -318,15 +347,15 @@ func ParseGetGitHubAccessTokenResponse(rsp *http.Response) (*GetGitHubAccessToke
 	return response, nil
 }
 
-// ParsePingResponse parses an HTTP response from a PingWithResponse call
-func ParsePingResponse(rsp *http.Response) (*PingResponse, error) {
+// ParseGetPingResponse parses an HTTP response from a GetPingWithResponse call
+func ParseGetPingResponse(rsp *http.Response) (*GetPingResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PingResponse{
+	response := &GetPingResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

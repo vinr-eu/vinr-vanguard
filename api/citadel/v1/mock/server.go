@@ -19,7 +19,7 @@ func NewServer() Server {
 	return Server{}
 }
 
-func (s Server) Ping(ctx *gin.Context) {
+func (s Server) GetPing(ctx *gin.Context) {
 	version := "1.0.0"
 	resp := PingResponse{
 		Status:    "ok",
@@ -29,7 +29,7 @@ func (s Server) Ping(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, resp)
 }
 
-func (s Server) GetGitHubAccessToken(ctx *gin.Context) {
+func (s Server) GetGithubAccessToken(ctx *gin.Context) {
 	accessToken := os.Getenv("GITHUB_ACCESS_TOKEN")
 	resp := GetGitHubAccessTokenResponse{
 		AccessToken: accessToken,

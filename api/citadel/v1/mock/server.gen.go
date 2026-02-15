@@ -41,10 +41,10 @@ type PingResponse struct {
 type ServerInterface interface {
 	// Retrieve a GitHub access token
 	// (GET /github/access-token)
-	GetGitHubAccessToken(c *gin.Context)
+	GetGithubAccessToken(c *gin.Context)
 	// Check Citadel connectivity
 	// (GET /ping)
-	Ping(c *gin.Context)
+	GetPing(c *gin.Context)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -56,8 +56,8 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(c *gin.Context)
 
-// GetGitHubAccessToken operation middleware
-func (siw *ServerInterfaceWrapper) GetGitHubAccessToken(c *gin.Context) {
+// GetGithubAccessToken operation middleware
+func (siw *ServerInterfaceWrapper) GetGithubAccessToken(c *gin.Context) {
 
 	c.Set(ApiKeyAuthScopes, []string{})
 
@@ -68,11 +68,11 @@ func (siw *ServerInterfaceWrapper) GetGitHubAccessToken(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetGitHubAccessToken(c)
+	siw.Handler.GetGithubAccessToken(c)
 }
 
-// Ping operation middleware
-func (siw *ServerInterfaceWrapper) Ping(c *gin.Context) {
+// GetPing operation middleware
+func (siw *ServerInterfaceWrapper) GetPing(c *gin.Context) {
 
 	c.Set(ApiKeyAuthScopes, []string{})
 
@@ -83,7 +83,7 @@ func (siw *ServerInterfaceWrapper) Ping(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.Ping(c)
+	siw.Handler.GetPing(c)
 }
 
 // GinServerOptions provides options for the Gin server.
@@ -113,6 +113,6 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
-	router.GET(options.BaseURL+"/github/access-token", wrapper.GetGitHubAccessToken)
-	router.GET(options.BaseURL+"/ping", wrapper.Ping)
+	router.GET(options.BaseURL+"/github/access-token", wrapper.GetGithubAccessToken)
+	router.GET(options.BaseURL+"/ping", wrapper.GetPing)
 }

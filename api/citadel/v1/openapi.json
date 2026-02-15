@@ -22,7 +22,6 @@
           "GitHub"
         ],
         "summary": "Retrieve a GitHub access token",
-        "operationId": "GetGitHubAccessToken",
         "responses": {
           "200": {
             "description": "Successfully retrieved GitHub access token",
@@ -50,7 +49,6 @@
     "/ping": {
       "get": {
         "summary": "Check Citadel connectivity",
-        "operationId": "Ping",
         "responses": {
           "200": {
             "description": "Successful connectivity check",
