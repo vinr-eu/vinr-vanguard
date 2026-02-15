@@ -47,7 +47,10 @@ func New(ctx context.Context, cfg *config.Config) (*Client, error) {
 
 func (c *Client) GetGithubAccessToken(ctx context.Context) (string, error) {
 	resp, err := c.api.GetGithubAccessTokenWithResponse(ctx)
-	if err := c.validateResponse(err, resp, func() interface{} { return resp.JSON200 }); err != nil {
+	err = validateResponse(err, resp, func() *gen.GetGitHubAccessTokenResponse {
+		return resp.JSON200
+	})
+	if err != nil {
 		return "", fmt.Errorf("failed to get GitHub access token: %w", err)
 	}
 
@@ -57,16 +60,16 @@ func (c *Client) GetGithubAccessToken(ctx context.Context) (string, error) {
 func (c *Client) Ping(ctx context.Context) error {
 	resp, err := c.api.GetPingWithResponse(ctx)
 
-	return c.validateResponse(err, resp, func() interface{} { return resp.JSON200 })
+	return validateResponse(err, resp, func() *gen.PingResponse {
+		return resp.JSON200
+	})
 }
 
 type statusCoder interface {
 	StatusCode() int
 }
 
-type payloadGetter func() interface{}
-
-func (c *Client) validateResponse(err error, resp statusCoder, getPayload payloadGetter) error {
+func validateResponse[T any](err error, resp statusCoder, getPayload func() *T) error {
 	if err != nil {
 		return fmt.Errorf("network error: %w", err)
 	}
@@ -82,21 +85,9 @@ func (c *Client) validateResponse(err error, resp statusCoder, getPayload payloa
 
 	payload := getPayload()
 
-	if isNil(payload) {
+	if payload == nil {
 		return fmt.Errorf("api error: status was %d but success payload was nil", code)
 	}
 
 	return nil
-}
-
-func isNil(i interface{}) bool {
-	if i == nil {
-		return true
-	}
-	switch v := i.(type) {
-	case *gen.PingResponse:
-		return v == nil
-	default:
-		return false
-	}
 }
