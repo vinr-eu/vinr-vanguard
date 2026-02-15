@@ -75,6 +75,8 @@ func main() {
 }
 
 func setupReverseProxy(router *gin.Engine, services map[string]*defs.Service) {
+	proxies := make(map[string]*httputil.ReverseProxy)
+
 	for _, svc := range services {
 		if svc.IngressHost == nil {
 			continue
@@ -103,9 +105,12 @@ func setupReverseProxy(router *gin.Engine, services map[string]*defs.Service) {
 		host := *svc.IngressHost
 
 		slog.Info("Setting up reverse proxy", "service", svc.Name, "host", host, "port", port)
+		proxies[host] = proxy
+	}
 
+	if len(proxies) > 0 {
 		router.Any("/*proxyPath", func(c *gin.Context) {
-			if c.Request.Host == host {
+			if proxy, ok := proxies[c.Request.Host]; ok {
 				proxy.ServeHTTP(c.Writer, c.Request)
 				c.Abort()
 				return
