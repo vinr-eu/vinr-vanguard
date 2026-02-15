@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"vinr.eu/vanguard/internal/citadel"
 	"vinr.eu/vanguard/internal/config"
+	"vinr.eu/vanguard/internal/defs"
 	"vinr.eu/vanguard/internal/environment"
 )
 
@@ -49,9 +52,10 @@ func main() {
 
 	// Set up the reverse proxy
 	router := gin.Default()
+	setupReverseProxy(router, manager.GetServices())
 	srv := &http.Server{
 		Handler: router,
-		Addr:    "0.0.0.0:8080",
+		Addr:    "0.0.0.0:80",
 	}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -68,4 +72,45 @@ func main() {
 		slog.Error("Failed to shutdown server", "error", err)
 	}
 	slog.Info("Server exiting")
+}
+
+func setupReverseProxy(router *gin.Engine, services map[string]*defs.Service) {
+	for _, svc := range services {
+		if svc.IngressHost == nil {
+			continue
+		}
+
+		var port string
+		for _, v := range svc.Variables {
+			if v.Name == "PORT" {
+				port = v.Value
+				break
+			}
+		}
+
+		if port == "" {
+			slog.Warn("Service has IngressHost but no PORT variable", "service", svc.Name)
+			continue
+		}
+
+		target, err := url.Parse("http://localhost:" + port)
+		if err != nil {
+			slog.Error("Failed to parse target URL", "service", svc.Name, "error", err)
+			continue
+		}
+
+		proxy := httputil.NewSingleHostReverseProxy(target)
+		host := *svc.IngressHost
+
+		slog.Info("Setting up reverse proxy", "service", svc.Name, "host", host, "port", port)
+
+		router.Any("/*proxyPath", func(c *gin.Context) {
+			if c.Request.Host == host {
+				proxy.ServeHTTP(c.Writer, c.Request)
+				c.Abort()
+				return
+			}
+			c.Next()
+		})
+	}
 }

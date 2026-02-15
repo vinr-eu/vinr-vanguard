@@ -22,6 +22,7 @@ type Environment struct {
 }
 
 type ServiceOverride struct {
-	Branch    *string
-	Variables []Variable
+	Branch      *string
+	IngressHost *string
+	Variables   []Variable
 }

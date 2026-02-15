@@ -37,6 +37,7 @@ type Environment struct {
 }
 
 type ServiceOverride struct {
-	Branch    *string    `json:"branch,omitempty"`
-	Variables []Variable `json:"variables,omitempty"`
+	Branch      *string    `json:"branch,omitempty"`
+	IngressHost *string    `json:"ingressHost,omitempty"`
+	Variables   []Variable `json:"variables,omitempty"`
 }

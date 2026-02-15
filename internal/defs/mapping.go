@@ -28,8 +28,9 @@ func mapEnvironmentV1(env *v1.Environment) *Environment {
 	overrides := make(map[string]ServiceOverride)
 	for name, o := range env.Overrides {
 		overrides[name] = ServiceOverride{
-			Branch:    o.Branch,
-			Variables: mapVariablesV1(o.Variables),
+			Branch:      o.Branch,
+			IngressHost: o.IngressHost,
+			Variables:   mapVariablesV1(o.Variables),
 		}
 	}
 

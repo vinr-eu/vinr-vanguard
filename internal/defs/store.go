@@ -107,6 +107,9 @@ func (s *Store) applyOverride(svc *Service, override ServiceOverride) {
 	if override.Branch != nil {
 		svc.Branch = *override.Branch
 	}
+	if override.IngressHost != nil {
+		svc.IngressHost = override.IngressHost
+	}
 	for _, v := range override.Variables {
 		updateOrAppendVariable(svc, v)
 	}

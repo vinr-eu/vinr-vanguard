@@ -66,6 +66,10 @@ func (m *Manager) Boot(ctx context.Context, envDefsGitURL string, envDefsDir str
 	return nil
 }
 
+func (m *Manager) GetServices() map[string]*defs.Service {
+	return m.defsStore.Services
+}
+
 func (m *Manager) deployService(ctx context.Context, svc *defs.Service) error {
 	if svc.GitURL == "" {
 		return fmt.Errorf("no Git URL for service %s", svc.Name)
