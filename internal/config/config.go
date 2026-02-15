@@ -6,20 +6,22 @@ import (
 )
 
 type Config struct {
-	Mode             string
-	CitadelURL       string
-	CitadelAPIKey    string
-	EnvDefsGitHubURL string
-	EnvDefsDir       string
+	Mode          string
+	WorkspaceDir  string
+	CitadelURL    string
+	CitadelAPIKey string
+	EnvDefsGitURL string
+	EnvDefsDir    string
 }
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		Mode:             getEnv("MODE", "local"),
-		CitadelURL:       os.Getenv("CITADEL_URL"),
-		CitadelAPIKey:    os.Getenv("CITADEL_API_KEY"),
-		EnvDefsGitHubURL: os.Getenv("ENV_DEFS_GITHUB_URL"),
-		EnvDefsDir:       os.Getenv("ENV_DEFS_DIR"),
+		Mode:          getEnv("MODE", "local"),
+		WorkspaceDir:  getEnv("WORKSPACE_DIR", "/tmp"),
+		CitadelURL:    os.Getenv("CITADEL_URL"),
+		CitadelAPIKey: os.Getenv("CITADEL_API_KEY"),
+		EnvDefsGitURL: os.Getenv("ENV_DEFS_GIT_URL"),
+		EnvDefsDir:    os.Getenv("ENV_DEFS_DIR"),
 	}
 
 	if err := cfg.applyDefaultsAndValidate(); err != nil {
@@ -45,12 +47,12 @@ func (c *Config) applyDefaultsAndValidate() error {
 		if c.CitadelAPIKey == "" {
 			return fmt.Errorf("CITADEL_API_KEY must be set in server mode")
 		}
-		if c.EnvDefsGitHubURL == "" {
+		if c.EnvDefsGitURL == "" {
 			return fmt.Errorf("ENV_DEFS_GITHUB_URL must be set in server mode")
 		}
 	}
 
-	if c.Mode == "local" && c.EnvDefsGitHubURL == "" && c.EnvDefsDir == "" {
+	if c.Mode == "local" && c.EnvDefsGitURL == "" && c.EnvDefsDir == "" {
 		return fmt.Errorf("either ENV_DEFS_GITHUB_URL or ENV_DEFS_DIR must be set in local mode")
 	}
 
@@ -59,8 +61,8 @@ func (c *Config) applyDefaultsAndValidate() error {
 
 func (c *Config) String() string {
 	return fmt.Sprintf(
-		"Mode=%s CitadelURL=%s GitHubURL=%s APIKey=[REDACTED]",
-		c.Mode, c.CitadelURL, c.EnvDefsGitHubURL,
+		"Mode=%s CitadelURL=%s EnvDefsGitURL=%s APIKey=[REDACTED]",
+		c.Mode, c.CitadelURL, c.EnvDefsGitURL,
 	)
 }
 

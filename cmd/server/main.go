@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"vinr.eu/vanguard/internal/citadel"
 	"vinr.eu/vanguard/internal/config"
-	"vinr.eu/vanguard/internal/engine"
+	"vinr.eu/vanguard/internal/environment"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func main() {
 		slog.Error("Failed to load config", "error", err)
 		os.Exit(1)
 	}
-	citadelClient, err := citadel.NewClient(
+	client, err := citadel.NewClient(
 		ctx,
 		cfg.CitadelURL,
 		citadel.WithAPIKey(cfg.CitadelAPIKey),
@@ -35,7 +35,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := engine.Boot(ctx, cfg, citadelClient); err != nil {
+	githubTokenProvider := func(ctx context.Context) (string, error) {
+		return client.GetGithubAccessToken(ctx)
+	}
+
+	manager := environment.NewManager(cfg.WorkspaceDir, githubTokenProvider)
+
+	if err := manager.Boot(ctx, cfg.EnvDefsGitURL, cfg.EnvDefsDir); err != nil {
 		slog.Error("Failed to boot engine", "error", err)
 		os.Exit(1)
 	}

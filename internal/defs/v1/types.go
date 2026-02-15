@@ -13,7 +13,7 @@ type Service struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:",inline"`
 
-	GitHubURL   string     `json:"gitHubUrl"`
+	GitURL      string     `json:"gitURL"`
 	Branch      *string    `json:"branch,omitempty"`
 	Path        *string    `json:"path,omitempty"`
 	RunScript   string     `json:"runScript"`
