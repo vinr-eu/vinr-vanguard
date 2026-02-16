@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
@@ -51,7 +52,9 @@ func main() {
 	}
 
 	// Set up the reverse proxy
-	router := gin.Default()
+	router := gin.New()
+	setupLogging(router)
+	router.Use(gin.Recovery())
 	setupReverseProxy(router, manager.GetServices())
 	srv := &http.Server{
 		Handler: router,
@@ -72,6 +75,37 @@ func main() {
 		slog.Error("Failed to shutdown server", "error", err)
 	}
 	slog.Info("Server exiting")
+}
+
+func setupLogging(router *gin.Engine) {
+	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+		var statusColor, methodColor, resetColor string
+		if param.IsOutputColor() {
+			statusColor = param.StatusCodeColor()
+			methodColor = param.MethodColor()
+			resetColor = param.ResetColor()
+		}
+
+		if param.Latency > time.Minute {
+			param.Latency = param.Latency.Truncate(time.Second)
+		}
+
+		host := ""
+		if param.Request != nil {
+			host = param.Request.Host
+		}
+
+		return fmt.Sprintf("[GIN] %v |%s %3d %s| %13v | %15s | %s |%s %-7s %s %#v\n%s",
+			param.TimeStamp.Format("2006/01/02 - 15:04:05"),
+			statusColor, param.StatusCode, resetColor,
+			param.Latency,
+			param.ClientIP,
+			host,
+			methodColor, param.Method, resetColor,
+			param.Path,
+			param.ErrorMessage,
+		)
+	}))
 }
 
 func setupReverseProxy(router *gin.Engine, services map[string]*defs.Service) {
