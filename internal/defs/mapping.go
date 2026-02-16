@@ -15,6 +15,7 @@ func mapServiceV1(svc *v1.Service) *Service {
 
 	return &Service{
 		Name:        svc.Name,
+		Runtime:     RuntimeSpec(svc.Runtime),
 		GitURL:      svc.GitURL,
 		Branch:      branch,
 		Path:        path,

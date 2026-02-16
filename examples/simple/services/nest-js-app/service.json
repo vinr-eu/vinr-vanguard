@@ -2,6 +2,10 @@
   "kind": "Service",
   "apiVersion": "v1",
   "name": "nest-js-app",
+  "runtime": {
+    "engine": "node",
+    "version": "22.22.0"
+  },
   "gitUrl": "https://github.com/richy-vinr/nest-js-app",
   "runScript": "npm run start"
 }

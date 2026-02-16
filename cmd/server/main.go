@@ -58,7 +58,7 @@ func main() {
 	setupReverseProxy(router, manager.GetServices())
 	srv := &http.Server{
 		Handler: router,
-		Addr:    "0.0.0.0:80",
+		Addr:    "0.0.0.0:8080",
 	}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -74,6 +74,7 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("Failed to shutdown server", "error", err)
 	}
+	manager.Shutdown()
 	slog.Info("Server exiting")
 }
 
@@ -125,7 +126,7 @@ func setupReverseProxy(router *gin.Engine, services map[string]*defs.Service) {
 		}
 
 		if port == "" {
-			slog.Warn("Service has IngressHost but no PORT variable", "service", svc.Name)
+			slog.Warn("service has IngressHost but no PORT variable", "service", svc.Name)
 			continue
 		}
 

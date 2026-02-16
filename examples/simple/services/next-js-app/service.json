@@ -2,6 +2,10 @@
   "kind": "Service",
   "apiVersion": "v1",
   "name": "next-js-app",
+  "runtime": {
+    "engine": "node",
+    "version": "24.13.1"
+  },
   "gitUrl": "https://github.com/richy-vinr/next-js-app",
   "runScript": "npm run dev"
 }

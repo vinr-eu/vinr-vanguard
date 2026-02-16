@@ -1,7 +1,13 @@
 package defs
 
+type RuntimeSpec struct {
+	Engine  string
+	Version string
+}
+
 type Service struct {
 	Name        string
+	Runtime     RuntimeSpec
 	GitURL      string
 	Branch      string
 	Path        string

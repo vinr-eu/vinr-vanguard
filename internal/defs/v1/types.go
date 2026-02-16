@@ -9,16 +9,22 @@ type ObjectMeta struct {
 	Name string `json:"name"`
 }
 
+type RuntimeSpec struct {
+	Engine  string `json:"engine"`
+	Version string `json:"version"`
+}
+
 type Service struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:",inline"`
 
-	GitURL      string     `json:"gitURL"`
-	Branch      *string    `json:"branch,omitempty"`
-	Path        *string    `json:"path,omitempty"`
-	RunScript   string     `json:"runScript"`
-	IngressHost *string    `json:"ingressHost,omitempty"`
-	Variables   []Variable `json:"variables,omitempty"`
+	Runtime     RuntimeSpec `json:"runtime"`
+	GitURL      string      `json:"gitURL"`
+	Branch      *string     `json:"branch,omitempty"`
+	Path        *string     `json:"path,omitempty"`
+	RunScript   string      `json:"runScript"`
+	IngressHost *string     `json:"ingressHost,omitempty"`
+	Variables   []Variable  `json:"variables,omitempty"`
 }
 
 type Variable struct {

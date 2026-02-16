@@ -137,7 +137,7 @@ func decodeV1(kind string, data []byte) (any, error) {
 	case "Service":
 		var svc v1.Service
 		if err := json.Unmarshal(data, &svc); err != nil {
-			return nil, fmt.Errorf("invalid v1.Service: %w", err)
+			return nil, fmt.Errorf("invalid v1.service: %w", err)
 		}
 		return &svc, nil
 	case "Environment":
