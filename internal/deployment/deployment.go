@@ -23,6 +23,8 @@ func New(svc *defs.Service, repoPath, binDir string) (Deployment, error) {
 	switch engine {
 	case "node":
 		return NewNodeDeployment(svc, repoPath, binDir), nil
+	case "openjdk":
+		return NewOpenJDKDeployment(svc, repoPath, binDir), nil
 	default:
 		return nil, fmt.Errorf("unsupported svc runtime: %s", svc.Runtime)
 	}

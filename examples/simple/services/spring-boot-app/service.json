@@ -1,0 +1,11 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1",
+  "name": "spring-boot-app",
+  "runtime": {
+    "engine": "openjdk",
+    "version": "25.0.2"
+  },
+  "gitUrl": "https://github.com/richy-vinr/spring-boot-app",
+  "runScript": "java -jar build/libs/spring-boot-app-0.0.1-SNAPSHOT.jar"
+}
