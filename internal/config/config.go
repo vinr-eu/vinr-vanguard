@@ -32,15 +32,16 @@ func Load() (*Config, error) {
 }
 
 func (c *Config) applyDefaultsAndValidate() error {
-	if c.Mode != "local" && c.Mode != "server" {
-		return fmt.Errorf("MODE must be 'local' or 'server', got %q", c.Mode)
-	}
+	switch c.Mode {
+	case "local":
+		if c.CitadelURL == "" {
+			c.CitadelURL = "http://localhost:9080"
+		}
 
-	if c.Mode == "local" && c.CitadelURL == "" {
-		c.CitadelURL = "http://localhost:9080"
-	}
-
-	if c.Mode == "server" {
+		if c.EnvDefsGitURL == "" && c.EnvDefsDir == "" {
+			return fmt.Errorf("either ENV_DEFS_GITHUB_URL or ENV_DEFS_DIR must be set in local mode")
+		}
+	case "server":
 		if c.CitadelURL == "" {
 			return fmt.Errorf("CITADEL_URL must be set in server mode")
 		}
@@ -50,10 +51,10 @@ func (c *Config) applyDefaultsAndValidate() error {
 		if c.EnvDefsGitURL == "" {
 			return fmt.Errorf("ENV_DEFS_GITHUB_URL must be set in server mode")
 		}
-	}
-
-	if c.Mode == "local" && c.EnvDefsGitURL == "" && c.EnvDefsDir == "" {
-		return fmt.Errorf("either ENV_DEFS_GITHUB_URL or ENV_DEFS_DIR must be set in local mode")
+	case "":
+		return fmt.Errorf("MODE must be set ('local' or 'server')")
+	default:
+		return fmt.Errorf("MODE must be 'local' or 'server', got %q", c.Mode)
 	}
 
 	return nil
