@@ -38,6 +38,7 @@ func NewGitHubSource(repoURL, branch string, githubTokenProvider TokenProvider) 
 		fetchGitHubToken: githubTokenProvider,
 	}
 }
+
 func (s *GitHubSource) Fetch(ctx context.Context, dest string) error {
 	token, err := s.fetchGitHubToken(ctx)
 	if err != nil {

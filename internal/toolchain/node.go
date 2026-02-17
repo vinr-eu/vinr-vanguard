@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"vinr.eu/vanguard/internal/errs"
 )
 
 type NodeToolchain struct {
@@ -25,36 +27,28 @@ func NewNodeToolchain(cacheDir string) *NodeToolchain {
 
 func (t *NodeToolchain) Provision(ctx context.Context, version string) (string, error) {
 	if version == "" {
-		version = "24.13.1"
+		version = "20.11.0"
 	}
-
 	installDir := filepath.Join(t.cacheDir, "toolchains", "node", version)
 	binDir := filepath.Join(installDir, "bin")
 	exe := filepath.Join(binDir, "node")
-
 	if runtime.GOOS == "windows" {
 		binDir = installDir
 		exe += ".exe"
 	}
-
 	if _, err := os.Stat(exe); err == nil {
 		return binDir, nil
 	}
-
 	slog.Info("provisioning node", "version", version)
 	tmpDir := installDir + ".tmp"
-
 	defer os.RemoveAll(tmpDir)
-
 	if err := t.downloadAndExtract(ctx, version, tmpDir); err != nil {
-		return "", fmt.Errorf("download failed: %w", err)
+		return "", errs.WrapMsg(ErrProvisionFailed, "node:"+version, err)
 	}
-
 	os.RemoveAll(installDir)
 	if err := os.Rename(tmpDir, installDir); err != nil {
-		return "", err
+		return "", errs.Wrap(ErrProvisionFailed, err)
 	}
-
 	return binDir, nil
 }
 
@@ -65,17 +59,14 @@ func (t *NodeToolchain) downloadAndExtract(ctx context.Context, version, dest st
 		return err
 	}
 	defer func() { err = errors.Join(err, resp.Body.Close()) }()
-
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad status: %s", resp.Status)
+		return fmt.Errorf("http %s", resp.Status)
 	}
-
 	gzr, err := gzip.NewReader(resp.Body)
 	if err != nil {
 		return err
 	}
 	defer func() { err = errors.Join(err, gzr.Close()) }()
-
 	tr := tar.NewReader(gzr)
 	for {
 		header, err := tr.Next()
@@ -85,19 +76,14 @@ func (t *NodeToolchain) downloadAndExtract(ctx context.Context, version, dest st
 		if err != nil {
 			return err
 		}
-
 		parts := strings.SplitN(header.Name, "/", 2)
-
 		if len(parts) < 2 || parts[1] == "" {
 			continue
 		}
-
 		target := filepath.Join(dest, parts[1])
-
 		if !strings.HasPrefix(target, filepath.Clean(dest)+string(os.PathSeparator)) {
-			return fmt.Errorf("illegal file path: %s", header.Name)
+			return fmt.Errorf("illegal path: %s", header.Name)
 		}
-
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(target, 0755); err != nil {
@@ -124,13 +110,11 @@ func (t *NodeToolchain) writeFile(path string, r io.Reader, mode os.FileMode) (e
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
-
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}
 	defer func() { err = errors.Join(err, f.Close()) }()
-
 	_, err = io.Copy(f, r)
 	return
 }

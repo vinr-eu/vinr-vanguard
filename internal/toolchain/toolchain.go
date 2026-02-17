@@ -2,7 +2,14 @@ package toolchain
 
 import (
 	"context"
-	"fmt"
+	"errors"
+
+	"vinr.eu/vanguard/internal/errs"
+)
+
+var (
+	ErrUnsupportedEngine = errors.New("toolchain: unsupported engine")
+	ErrProvisionFailed   = errors.New("toolchain: provision failed")
 )
 
 type Toolchain interface {
@@ -16,6 +23,6 @@ func New(engine string, cacheDir string) (Toolchain, error) {
 	case "openjdk":
 		return NewOpenJDKToolchain(cacheDir), nil
 	default:
-		return nil, fmt.Errorf("no toolchain available for engine: %s", engine)
+		return nil, errs.WrapMsg(ErrUnsupportedEngine, engine, nil)
 	}
 }
