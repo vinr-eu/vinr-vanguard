@@ -2,11 +2,22 @@ package citadel
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	gen "vinr.eu/vanguard/api/citadel/v1"
+)
+
+var (
+	ErrInitFailed    = errors.New("citadel: client init failed")
+	ErrNetwork       = errors.New("citadel: network error")
+	ErrEmptyResponse = errors.New("citadel: empty response")
+	ErrPayloadNil    = errors.New("citadel: payload nil")
+	ErrUnauthorized  = errors.New("citadel: unauthorized (401)")
+	ErrNotFound      = errors.New("citadel: not found (404)")
+	ErrApiFailure    = errors.New("citadel: unexpected api response")
 )
 
 type Client struct {
@@ -30,55 +41,32 @@ func WithTimeout(d time.Duration) Option {
 }
 
 func NewClient(baseURL string, opts ...Option) (*Client, error) {
-	client := &Client{
+	c := &Client{
 		timeout: 10 * time.Second,
 	}
-
 	for _, opt := range opts {
-		opt(client)
+		opt(c)
 	}
-
-	apiKeyInjector := func(ctx context.Context, req *http.Request) error {
-		if client.apiKey != "" {
-			req.Header.Set("x-api-key", client.apiKey)
-		}
-		return nil
+	httpClient := &http.Client{
+		Timeout: c.timeout,
 	}
-
 	apiClient, err := gen.NewClientWithResponses(
 		baseURL,
-		gen.WithRequestEditorFn(apiKeyInjector),
-		gen.WithHTTPClient(&http.Client{
-			Timeout: client.timeout,
-		}),
+		gen.WithHTTPClient(httpClient),
+		gen.WithRequestEditorFn(c.authenticate),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create citadel client: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrInitFailed, err)
 	}
-
-	client.api = apiClient
-
-	return client, nil
+	c.api = apiClient
+	return c, nil
 }
 
-func (c *Client) GetGithubAccessToken(ctx context.Context) (string, error) {
-	resp, err := c.api.GetGithubAccessTokenWithResponse(ctx)
-	err = validateResponse(err, resp, func() *gen.GetGitHubAccessTokenResponse {
-		return resp.JSON200
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to get GitHub access token: %w", err)
+func (c *Client) authenticate(_ context.Context, req *http.Request) error {
+	if c.apiKey != "" {
+		req.Header.Set("x-api-key", c.apiKey)
 	}
-
-	return resp.JSON200.AccessToken, nil
-}
-
-func (c *Client) Ping(ctx context.Context) error {
-	resp, err := c.api.GetPingWithResponse(ctx)
-
-	return validateResponse(err, resp, func() *gen.PingResponse {
-		return resp.JSON200
-	})
+	return nil
 }
 
 func (c *Client) String() string {
@@ -89,25 +77,37 @@ type statusCoder interface {
 	StatusCode() int
 }
 
-func validateResponse[T any](err error, resp statusCoder, getPayload func() *T) error {
+func (c *Client) GetGithubAccessToken(ctx context.Context) (string, error) {
+	resp, err := c.api.GetGithubAccessTokenWithResponse(ctx)
+	if err := validateResponse(err, resp, func() bool { return resp.JSON200 != nil }); err != nil {
+		return "", err
+	}
+	return resp.JSON200.AccessToken, nil
+}
+
+func (c *Client) Ping(ctx context.Context) error {
+	resp, err := c.api.GetPingWithResponse(ctx)
+	return validateResponse(err, resp, func() bool { return resp.JSON200 != nil })
+}
+
+func validateResponse(err error, resp statusCoder, hasPayload func() bool) error {
 	if err != nil {
-		return fmt.Errorf("network error: %w", err)
+		return ErrNetwork
 	}
-
 	if resp == nil {
-		return fmt.Errorf("received empty response from citadel")
+		return ErrEmptyResponse
 	}
-
-	code := resp.StatusCode()
-	if code < 200 || code >= 300 {
-		return fmt.Errorf("api error: http status %d", code)
+	switch resp.StatusCode() {
+	case 200, 201, 204:
+		if !hasPayload() {
+			return ErrPayloadNil
+		}
+		return nil
+	case 401, 403:
+		return ErrUnauthorized
+	case 404:
+		return ErrNotFound
+	default:
+		return ErrApiFailure
 	}
-
-	payload := getPayload()
-
-	if payload == nil {
-		return fmt.Errorf("api error: status was %d but success payload was nil", code)
-	}
-
-	return nil
 }
