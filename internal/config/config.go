@@ -1,8 +1,15 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
+)
+
+var (
+	ErrInvalidMode    = errors.New("config: MODE must be 'local' or 'server'")
+	ErrMissingCitadel = errors.New("config: CITADEL_URL or API_KEY missing for server mode")
+	ErrMissingEnvDefs = errors.New("config: ENV_DEFS configuration incomplete")
 )
 
 type Config struct {
@@ -23,40 +30,31 @@ func Load() (*Config, error) {
 		EnvDefsGitURL: os.Getenv("ENV_DEFS_GIT_URL"),
 		EnvDefsDir:    os.Getenv("ENV_DEFS_DIR"),
 	}
-
-	if err := cfg.applyDefaultsAndValidate(); err != nil {
+	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
-
 	return cfg, nil
 }
 
-func (c *Config) applyDefaultsAndValidate() error {
+func (c *Config) validate() error {
 	switch c.Mode {
 	case "local":
 		if c.CitadelURL == "" {
 			c.CitadelURL = "http://localhost:9080"
 		}
-
 		if c.EnvDefsGitURL == "" && c.EnvDefsDir == "" {
-			return fmt.Errorf("either ENV_DEFS_GITHUB_URL or ENV_DEFS_DIR must be set in local mode")
+			return ErrMissingEnvDefs
 		}
 	case "server":
-		if c.CitadelURL == "" {
-			return fmt.Errorf("CITADEL_URL must be set in server mode")
-		}
-		if c.CitadelAPIKey == "" {
-			return fmt.Errorf("CITADEL_API_KEY must be set in server mode")
+		if c.CitadelURL == "" || c.CitadelAPIKey == "" {
+			return ErrMissingCitadel
 		}
 		if c.EnvDefsGitURL == "" {
-			return fmt.Errorf("ENV_DEFS_GITHUB_URL must be set in server mode")
+			return ErrMissingEnvDefs
 		}
-	case "":
-		return fmt.Errorf("MODE must be set ('local' or 'server')")
 	default:
-		return fmt.Errorf("MODE must be 'local' or 'server', got %q", c.Mode)
+		return fmt.Errorf("%w: got %q", ErrInvalidMode, c.Mode)
 	}
-
 	return nil
 }
 
