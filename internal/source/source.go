@@ -2,8 +2,14 @@ package source
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strings"
+
+	"vinr.eu/vanguard/internal/errs"
+)
+
+var (
+	ErrUnsupportedProvider = errors.New("source: unsupported provider")
 )
 
 type TokenProvider func(ctx context.Context) (string, error)
@@ -17,6 +23,6 @@ func New(repoURL, branch string, githubTokenProvider TokenProvider) (Source, err
 	case strings.Contains(repoURL, "github.com"):
 		return NewGitHubSource(repoURL, branch, githubTokenProvider), nil
 	default:
-		return nil, fmt.Errorf("unsupported source provider: %s", repoURL)
+		return nil, errs.WrapMsg(ErrUnsupportedProvider, repoURL, nil)
 	}
 }
