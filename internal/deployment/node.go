@@ -3,6 +3,7 @@ package deployment
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,6 +13,13 @@ import (
 	"strings"
 
 	"vinr.eu/vanguard/internal/defs"
+	"vinr.eu/vanguard/internal/errs"
+)
+
+var (
+	ErrInstallFailed = errors.New("node: install failed")
+	ErrStartFailed   = errors.New("node: start failed")
+	ErrPipeFailed    = errors.New("node: pipe setup failed")
 )
 
 type NodeDeployment struct {
@@ -27,31 +35,25 @@ func NewNodeDeployment(svc *defs.Service, repoPath, binDir string) *NodeDeployme
 	if svc.Path != "" {
 		execPath = filepath.Join(repoPath, svc.Path)
 	}
-
 	return &NodeDeployment{
 		svc:      svc,
 		execPath: execPath,
 		binDir:   binDir,
-		logger: slog.Default().With("svc", svc.Name, "engine", svc.Runtime.Engine,
-			"version", svc.Runtime.Version),
+		logger:   slog.Default().With("svc", svc.Name, "engine", svc.Runtime.Engine, "version", svc.Runtime.Version),
 	}
 }
 
 func (d *NodeDeployment) Install(ctx context.Context) error {
 	manager := d.detectManager()
 	d.logger.Info("installing dependencies", "manager", manager)
-
 	cmd := exec.CommandContext(ctx, manager, "install")
 	cmd.Dir = d.execPath
-
 	if err := d.setupPipes(ctx, cmd); err != nil {
-		return err
+		return errs.Wrap(ErrPipeFailed, err)
 	}
-
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s install failed: %w", manager, err)
+		return errs.WrapMsg(ErrInstallFailed, manager, err)
 	}
-
 	return nil
 }
 
@@ -60,20 +62,16 @@ func (d *NodeDeployment) Start(ctx context.Context) error {
 		d.logger.Warn("no runScript provided, nothing to start")
 		return nil
 	}
-
 	args := strings.Fields(d.svc.RunScript)
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Dir = d.execPath
 	cmd.Env = d.buildEnv()
-
 	if err := d.setupPipes(ctx, cmd); err != nil {
-		return err
+		return errs.Wrap(ErrPipeFailed, err)
 	}
-
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start process: %w", err)
+		return errs.Wrap(ErrStartFailed, err)
 	}
-
 	d.cmd = cmd
 	d.logger.Info("process started", "pid", cmd.Process.Pid)
 	return nil
@@ -88,12 +86,10 @@ func (d *NodeDeployment) Stop() error {
 
 func (d *NodeDeployment) buildEnv() []string {
 	env := os.Environ()
-
 	if d.binDir != "" {
 		existingPath := os.Getenv("PATH")
 		env = append(env, fmt.Sprintf("PATH=%s:%s", d.binDir, existingPath))
 	}
-
 	for _, v := range d.svc.Variables {
 		env = append(env, fmt.Sprintf("%s=%s", v.Name, v.Value))
 	}
@@ -115,9 +111,14 @@ func (d *NodeDeployment) detectManager() string {
 }
 
 func (d *NodeDeployment) setupPipes(ctx context.Context, cmd *exec.Cmd) error {
-	stdout, _ := cmd.StdoutPipe()
-	stderr, _ := cmd.StderrPipe()
-
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
 	go d.logPipe(ctx, stdout, slog.LevelInfo)
 	go d.logPipe(ctx, stderr, slog.LevelError)
 	return nil

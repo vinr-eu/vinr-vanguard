@@ -3,6 +3,7 @@ package deployment
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,6 +13,13 @@ import (
 	"strings"
 
 	"vinr.eu/vanguard/internal/defs"
+	"vinr.eu/vanguard/internal/errs"
+)
+
+var (
+	ErrJavaBuildFailed = errors.New("openjdk: build failed")
+	ErrJavaStartFailed = errors.New("openjdk: start failed")
+	ErrJavaPipeFailed  = errors.New("openjdk: pipe setup failed")
 )
 
 type OpenJDKDeployment struct {
@@ -27,32 +35,26 @@ func NewOpenJDKDeployment(svc *defs.Service, repoPath, binDir string) *OpenJDKDe
 	if svc.Path != "" {
 		execPath = filepath.Join(repoPath, svc.Path)
 	}
-
 	return &OpenJDKDeployment{
 		svc:      svc,
 		execPath: execPath,
 		binDir:   binDir,
-		logger: slog.Default().With("svc", svc.Name, "engine", svc.Runtime.Engine,
-			"version", svc.Runtime.Version),
+		logger:   slog.Default().With("svc", svc.Name, "engine", svc.Runtime.Engine, "version", svc.Runtime.Version),
 	}
 }
 
 func (d *OpenJDKDeployment) Install(ctx context.Context) error {
 	manager, args := d.detectManager()
 	d.logger.Info("building artifact", "manager", manager)
-
 	cmd := exec.CommandContext(ctx, manager, args...)
 	cmd.Dir = d.execPath
 	cmd.Env = d.buildEnv()
-
 	if err := d.setupPipes(ctx, cmd); err != nil {
-		return err
+		return errs.Wrap(ErrJavaPipeFailed, err)
 	}
-
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s build failed: %w", manager, err)
+		return errs.WrapMsg(ErrJavaBuildFailed, manager, err)
 	}
-
 	return nil
 }
 
@@ -61,26 +63,20 @@ func (d *OpenJDKDeployment) Start(ctx context.Context) error {
 		d.logger.Warn("no runScript provided, nothing to start")
 		return nil
 	}
-
 	args := strings.Fields(d.svc.RunScript)
 	commandName := args[0]
-
 	if d.binDir != "" && (commandName == "java" || commandName == "java.exe") {
 		commandName = filepath.Join(d.binDir, commandName)
 	}
-
 	cmd := exec.CommandContext(ctx, commandName, args[1:]...)
 	cmd.Dir = d.execPath
 	cmd.Env = d.buildEnv()
-
 	if err := d.setupPipes(ctx, cmd); err != nil {
-		return err
+		return errs.Wrap(ErrJavaPipeFailed, err)
 	}
-
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start process: %w", err)
+		return errs.Wrap(ErrJavaStartFailed, err)
 	}
-
 	d.cmd = cmd
 	d.logger.Info("process started", "pid", cmd.Process.Pid)
 	return nil
@@ -95,15 +91,12 @@ func (d *OpenJDKDeployment) Stop() error {
 
 func (d *OpenJDKDeployment) buildEnv() []string {
 	env := os.Environ()
-
 	if d.binDir != "" {
 		existingPath := os.Getenv("PATH")
 		env = append(env, fmt.Sprintf("PATH=%s:%s", d.binDir, existingPath))
-
 		javaHome := filepath.Dir(d.binDir)
 		env = append(env, fmt.Sprintf("JAVA_HOME=%s", javaHome))
 	}
-
 	for _, v := range d.svc.Variables {
 		env = append(env, fmt.Sprintf("%s=%s", v.Name, v.Value))
 	}
@@ -124,9 +117,14 @@ func (d *OpenJDKDeployment) detectManager() (string, []string) {
 }
 
 func (d *OpenJDKDeployment) setupPipes(ctx context.Context, cmd *exec.Cmd) error {
-	stdout, _ := cmd.StdoutPipe()
-	stderr, _ := cmd.StderrPipe()
-
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
 	go d.logPipe(ctx, stdout, slog.LevelInfo)
 	go d.logPipe(ctx, stderr, slog.LevelError)
 	return nil
