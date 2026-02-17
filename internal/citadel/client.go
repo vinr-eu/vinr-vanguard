@@ -3,11 +3,11 @@ package citadel
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
 	gen "vinr.eu/vanguard/api/citadel/v1"
+	"vinr.eu/vanguard/internal/errs"
 )
 
 var (
@@ -56,7 +56,7 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 		gen.WithRequestEditorFn(c.authenticate),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInitFailed, err)
+		return nil, errs.Wrap(ErrInitFailed, err)
 	}
 	c.api = apiClient
 	return c, nil

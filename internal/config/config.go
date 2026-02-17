@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+
+	"vinr.eu/vanguard/internal/errs" // Importing your new utility
 )
 
 var (
@@ -53,7 +55,7 @@ func (c *Config) validate() error {
 			return ErrMissingEnvDefs
 		}
 	default:
-		return fmt.Errorf("%w: got %q", ErrInvalidMode, c.Mode)
+		return errs.WrapMsg(ErrInvalidMode, "got "+c.Mode, nil)
 	}
 	return nil
 }
