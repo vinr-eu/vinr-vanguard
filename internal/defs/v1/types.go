@@ -28,10 +28,9 @@ type Service struct {
 }
 
 type Variable struct {
-	Name          string  `json:"name"`
-	Value         *string `json:"value,omitempty"`
-	Ref           *string `json:"ref,omitempty"`
-	RefExpression *string `json:"refExpression,omitempty"`
+	Name  string  `json:"name"`
+	Value *string `json:"value,omitempty"`
+	Ref   *string `json:"ref,omitempty"`
 }
 
 type Environment struct {

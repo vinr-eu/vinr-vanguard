@@ -91,7 +91,7 @@ func (d *NodeDeployment) buildEnv() []string {
 		env = append(env, fmt.Sprintf("PATH=%s:%s", d.binDir, existingPath))
 	}
 	for _, v := range d.svc.Variables {
-		env = append(env, fmt.Sprintf("%s=%s", v.Name, v.Value))
+		env = append(env, fmt.Sprintf("%s=%s", v.Name, *v.Value))
 	}
 	return env
 }

@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/oapi-codegen/runtime"
 )
 
 const (
@@ -22,6 +24,17 @@ const (
 type ErrorResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
+}
+
+// GetAwsSecretResponse defines model for GetAwsSecretResponse.
+type GetAwsSecretResponse struct {
+	Entries *[]struct {
+		Key   *string `json:"key,omitempty"`
+		Value *string `json:"value,omitempty"`
+	} `json:"entries,omitempty"`
+
+	// PlainText Populated if it's a raw string
+	PlainText *string `json:"plainText,omitempty"`
 }
 
 // GetGitHubAccessTokenResponse defines model for GetGitHubAccessTokenResponse.
@@ -115,11 +128,26 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// GetAwsSecretsId request
+	GetAwsSecretsId(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetGithubAccessToken request
 	GetGithubAccessToken(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPing request
 	GetPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) GetAwsSecretsId(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAwsSecretsIdRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) GetGithubAccessToken(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -144,6 +172,40 @@ func (c *Client) GetPing(ctx context.Context, reqEditors ...RequestEditorFn) (*h
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewGetAwsSecretsIdRequest generates requests for GetAwsSecretsId
+func NewGetAwsSecretsIdRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/aws/secrets/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewGetGithubAccessTokenRequest generates requests for GetGithubAccessToken
@@ -243,11 +305,37 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// GetAwsSecretsIdWithResponse request
+	GetAwsSecretsIdWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetAwsSecretsIdResponse, error)
+
 	// GetGithubAccessTokenWithResponse request
 	GetGithubAccessTokenWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetGithubAccessTokenResponse, error)
 
 	// GetPingWithResponse request
 	GetPingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetPingResponse, error)
+}
+
+type GetAwsSecretsIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GetAwsSecretResponse
+	JSON404      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAwsSecretsIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAwsSecretsIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type GetGithubAccessTokenResponse struct {
@@ -296,6 +384,15 @@ func (r GetPingResponse) StatusCode() int {
 	return 0
 }
 
+// GetAwsSecretsIdWithResponse request returning *GetAwsSecretsIdResponse
+func (c *ClientWithResponses) GetAwsSecretsIdWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetAwsSecretsIdResponse, error) {
+	rsp, err := c.GetAwsSecretsId(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAwsSecretsIdResponse(rsp)
+}
+
 // GetGithubAccessTokenWithResponse request returning *GetGithubAccessTokenResponse
 func (c *ClientWithResponses) GetGithubAccessTokenWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetGithubAccessTokenResponse, error) {
 	rsp, err := c.GetGithubAccessToken(ctx, reqEditors...)
@@ -312,6 +409,39 @@ func (c *ClientWithResponses) GetPingWithResponse(ctx context.Context, reqEditor
 		return nil, err
 	}
 	return ParseGetPingResponse(rsp)
+}
+
+// ParseGetAwsSecretsIdResponse parses an HTTP response from a GetAwsSecretsIdWithResponse call
+func ParseGetAwsSecretsIdResponse(rsp *http.Response) (*GetAwsSecretsIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAwsSecretsIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GetAwsSecretResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseGetGithubAccessTokenResponse parses an HTTP response from a GetGithubAccessTokenWithResponse call

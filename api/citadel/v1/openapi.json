@@ -16,6 +16,47 @@
     }
   ],
   "paths": {
+    "/aws/secrets/{id}": {
+      "get": {
+        "tags": [
+          "AWS"
+        ],
+        "summary": "Retrieve an AWS Secret",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The ARN or name of the secret",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAwsSecretResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Secret not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/github/access-token": {
       "get": {
         "tags": [
@@ -93,6 +134,29 @@
           "accessToken": {
             "type": "string",
             "description": "The GitHub access token"
+          }
+        }
+      },
+      "GetAwsSecretResponse": {
+        "type": "object",
+        "properties": {
+          "plainText": {
+            "type": "string",
+            "description": "Populated if it's a raw string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       },

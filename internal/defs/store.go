@@ -1,14 +1,17 @@
 package defs
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"vinr.eu/vanguard/internal/citadel"
 	"vinr.eu/vanguard/internal/defs/v1"
 	"vinr.eu/vanguard/internal/errs"
 )
@@ -22,18 +25,24 @@ var (
 	ErrImportFailed   = errors.New("defs: import failed")
 )
 
+const AwsSecretPrefix = "aws/secrets/"
+
+type SecretProvider func(ctx context.Context, id string) (*citadel.SecretResponse, error)
+
 type Store struct {
-	Environment *Environment
-	Services    map[string]*Service
+	Environment    *Environment
+	Services       map[string]*Service
+	fetchAwsSecret SecretProvider
 }
 
-func NewStore() *Store {
+func NewStore(awsSecretProvider SecretProvider) *Store {
 	return &Store{
-		Services: make(map[string]*Service),
+		Services:       make(map[string]*Service),
+		fetchAwsSecret: awsSecretProvider,
 	}
 }
 
-func (s *Store) Load(rootPath string) error {
+func (s *Store) Load(ctx context.Context, rootPath string) error {
 	err := filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -49,7 +58,7 @@ func (s *Store) Load(rootPath string) error {
 	if s.Environment == nil {
 		return errs.WrapMsg(ErrNoEnvironment, "checked "+rootPath, nil)
 	}
-	return s.processEnvironment(rootPath)
+	return s.processEnvironment(ctx, rootPath)
 }
 
 func (s *Store) loadFile(path string) error {
@@ -73,12 +82,15 @@ func (s *Store) loadFile(path string) error {
 	return nil
 }
 
-func (s *Store) processEnvironment(rootPath string) error {
+func (s *Store) processEnvironment(ctx context.Context, rootPath string) error {
 	for _, imp := range s.Environment.Imports {
 		importPath := filepath.Join(rootPath, filepath.Clean(imp))
 		if err := s.loadImport(importPath); err != nil {
 			return errs.WrapMsg(ErrImportFailed, imp, err)
 		}
+	}
+	for _, svc := range s.Services {
+		s.resolveServiceSecrets(ctx, svc)
 	}
 	for name, override := range s.Environment.Overrides {
 		svc, ok := s.Services[name]
@@ -86,7 +98,7 @@ func (s *Store) processEnvironment(rootPath string) error {
 			slog.Warn("skipping override: service not found", "service", name)
 			continue
 		}
-		s.applyOverride(svc, override)
+		s.applyOverride(ctx, svc, override)
 	}
 	return nil
 }
@@ -106,7 +118,7 @@ func (s *Store) loadImport(path string) error {
 	})
 }
 
-func (s *Store) applyOverride(svc *Service, override ServiceOverride) {
+func (s *Store) applyOverride(ctx context.Context, svc *Service, override ServiceOverride) {
 	if override.Branch != nil {
 		svc.Branch = *override.Branch
 	}
@@ -114,8 +126,59 @@ func (s *Store) applyOverride(svc *Service, override ServiceOverride) {
 		svc.IngressHost = override.IngressHost
 	}
 	for _, v := range override.Variables {
-		updateOrAppendVariable(svc, v)
+		expandedVars := s.expandVariable(ctx, v)
+		for _, ev := range expandedVars {
+			updateOrAppendVariable(svc, ev)
+		}
 	}
+}
+
+func (s *Store) resolveServiceSecrets(ctx context.Context, svc *Service) {
+	var finalVars []Variable
+	for _, v := range svc.Variables {
+		finalVars = append(finalVars, s.expandVariable(ctx, v)...)
+	}
+	svc.Variables = finalVars
+}
+
+func (s *Store) expandVariable(ctx context.Context, v Variable) []Variable {
+	if v.Value != nil {
+		return []Variable{v}
+	}
+	if v.Ref == nil {
+		return []Variable{v}
+	}
+	if !strings.HasPrefix(*v.Ref, AwsSecretPrefix) {
+		return []Variable{v}
+	}
+	secretID := strings.TrimPrefix(*v.Ref, AwsSecretPrefix)
+	resp, err := s.fetchAwsSecret(ctx, secretID)
+	if err != nil {
+		slog.Error("failed to fetch secret", "id", secretID, "error", err)
+		return []Variable{v}
+	}
+	if resp.PlainText != nil {
+		return []Variable{{
+			Name:  v.Name,
+			Value: resp.PlainText,
+		}}
+	}
+	if resp.Entries != nil {
+		var expanded []Variable
+		prefix := strings.ToUpper(v.Name)
+		for _, entry := range *resp.Entries {
+			if entry.Key != nil && entry.Value != nil {
+				suffix := strings.ToUpper(*entry.Key)
+				newName := fmt.Sprintf("%s_%s", prefix, suffix)
+				expanded = append(expanded, Variable{
+					Name:  newName,
+					Value: entry.Value,
+				})
+			}
+		}
+		return expanded
+	}
+	return []Variable{v}
 }
 
 func decode(data []byte) (any, error) {
@@ -123,11 +186,9 @@ func decode(data []byte) (any, error) {
 		Kind       string `json:"kind"`
 		APIVersion string `json:"apiVersion"`
 	}
-
 	if err := json.Unmarshal(data, &meta); err != nil {
 		return nil, errs.Wrap(ErrDecodeFailed, err)
 	}
-
 	switch meta.APIVersion {
 	case "v1", "":
 		return decodeV1(meta.Kind, data)

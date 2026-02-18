@@ -27,7 +27,7 @@ func NewOpenJDKToolchain(cacheDir string) *OpenJDKToolchain {
 
 func (t *OpenJDKToolchain) Provision(ctx context.Context, version string) (string, error) {
 	if version == "" {
-		version = "21"
+		version = "25"
 	}
 	installDir := filepath.Join(t.cacheDir, "toolchains", "openjdk", version)
 	marker := filepath.Join(installDir, "release")

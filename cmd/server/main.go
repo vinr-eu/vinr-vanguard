@@ -43,9 +43,12 @@ func main() {
 	githubTokenProvider := func(ctx context.Context) (string, error) {
 		return client.GetGithubAccessToken(ctx)
 	}
+	awsSecretProvider := func(ctx context.Context, id string) (*citadel.SecretResponse, error) {
+		return client.GetAwsSecret(ctx, id)
+	}
 
 	// Load environment manager and Boot the environment
-	manager := environment.NewManager(cfg.WorkspaceDir, githubTokenProvider)
+	manager := environment.NewManager(cfg.WorkspaceDir, githubTokenProvider, awsSecretProvider)
 	if err := manager.Boot(ctx, cfg.EnvDefsGitURL, cfg.EnvDefsDir); err != nil {
 		slog.Error("Failed to boot engine", "error", err)
 		os.Exit(1)
@@ -119,8 +122,8 @@ func setupReverseProxy(router *gin.Engine, services map[string]*defs.Service) {
 
 		var port string
 		for _, v := range svc.Variables {
-			if v.Name == "PORT" {
-				port = v.Value
+			if v.Name == "PORT" || v.Name == "SERVER_PORT" {
+				port = *v.Value
 				break
 			}
 		}

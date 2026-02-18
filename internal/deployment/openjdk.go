@@ -98,7 +98,7 @@ func (d *OpenJDKDeployment) buildEnv() []string {
 		env = append(env, fmt.Sprintf("JAVA_HOME=%s", javaHome))
 	}
 	for _, v := range d.svc.Variables {
-		env = append(env, fmt.Sprintf("%s=%s", v.Name, v.Value))
+		env = append(env, fmt.Sprintf("%s=%s", v.Name, *v.Value))
 	}
 	return env
 }

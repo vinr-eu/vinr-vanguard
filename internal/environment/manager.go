@@ -28,11 +28,11 @@ type Manager struct {
 	activeDeployments   map[string]deployment.Deployment
 }
 
-func NewManager(workspaceDir string, githubTokenProvider source.TokenProvider) *Manager {
+func NewManager(workspaceDir string, githubTokenProvider source.TokenProvider, awsSecretProvider defs.SecretProvider) *Manager {
 	return &Manager{
 		workspaceDir:        workspaceDir,
 		githubTokenProvider: githubTokenProvider,
-		defsStore:           defs.NewStore(),
+		defsStore:           defs.NewStore(awsSecretProvider),
 		activeDeployments:   make(map[string]deployment.Deployment),
 	}
 }
@@ -54,7 +54,7 @@ func (m *Manager) Boot(ctx context.Context, envDefsGitURL string, envDefsDir str
 	} else {
 		return ErrNoSource
 	}
-	if err := m.defsStore.Load(envPath); err != nil {
+	if err := m.defsStore.Load(ctx, envPath); err != nil {
 		return errs.WrapMsg(ErrBootFailed, "store load", err)
 	}
 	runtimePaths, err := m.ProvisionAll(ctx)

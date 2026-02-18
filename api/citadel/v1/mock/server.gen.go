@@ -4,9 +4,12 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/oapi-codegen/runtime"
 )
 
 const (
@@ -17,6 +20,17 @@ const (
 type ErrorResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
+}
+
+// GetAwsSecretResponse defines model for GetAwsSecretResponse.
+type GetAwsSecretResponse struct {
+	Entries *[]struct {
+		Key   *string `json:"key,omitempty"`
+		Value *string `json:"value,omitempty"`
+	} `json:"entries,omitempty"`
+
+	// PlainText Populated if it's a raw string
+	PlainText *string `json:"plainText,omitempty"`
 }
 
 // GetGitHubAccessTokenResponse defines model for GetGitHubAccessTokenResponse.
@@ -39,6 +53,9 @@ type PingResponse struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Retrieve an AWS Secret
+	// (GET /aws/secrets/{id})
+	GetAwsSecretsId(c *gin.Context, id string)
 	// Retrieve a GitHub access token
 	// (GET /github/access-token)
 	GetGithubAccessToken(c *gin.Context)
@@ -55,6 +72,32 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(c *gin.Context)
+
+// GetAwsSecretsId operation middleware
+func (siw *ServerInterfaceWrapper) GetAwsSecretsId(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(ApiKeyAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetAwsSecretsId(c, id)
+}
 
 // GetGithubAccessToken operation middleware
 func (siw *ServerInterfaceWrapper) GetGithubAccessToken(c *gin.Context) {
@@ -113,6 +156,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
+	router.GET(options.BaseURL+"/aws/secrets/:id", wrapper.GetAwsSecretsId)
 	router.GET(options.BaseURL+"/github/access-token", wrapper.GetGithubAccessToken)
 	router.GET(options.BaseURL+"/ping", wrapper.GetPing)
 }

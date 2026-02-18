@@ -1,6 +1,8 @@
 package defs
 
-import "vinr.eu/vanguard/internal/defs/v1"
+import (
+	"vinr.eu/vanguard/internal/defs/v1"
+)
 
 func mapServiceV1(svc *v1.Service) *Service {
 	branch := "main"
@@ -47,7 +49,8 @@ func mapVariablesV1(vars []v1.Variable) []Variable {
 	for i, v := range vars {
 		out[i] = Variable{
 			Name:  v.Name,
-			Value: *v.Value, //TODO parse secrets and other references to value
+			Value: v.Value,
+			Ref:   v.Ref,
 		}
 	}
 	return out

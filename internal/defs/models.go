@@ -18,7 +18,8 @@ type Service struct {
 
 type Variable struct {
 	Name  string
-	Value string
+	Value *string
+	Ref   *string
 }
 
 type Environment struct {

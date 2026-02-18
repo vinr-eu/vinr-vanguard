@@ -77,6 +77,29 @@ type statusCoder interface {
 	StatusCode() int
 }
 
+func (c *Client) GetAwsSecret(ctx context.Context, id string) (*SecretResponse, error) {
+	resp, err := c.api.GetAwsSecretsIdWithResponse(ctx, id)
+	if err := validateResponse(err, resp, func() bool { return resp.JSON200 != nil }); err != nil {
+		return nil, err
+	}
+
+	res := &SecretResponse{
+		PlainText: resp.JSON200.PlainText,
+	}
+	if resp.JSON200.Entries != nil {
+		entries := make([]SecretEntry, 0, len(*resp.JSON200.Entries))
+		for _, e := range *resp.JSON200.Entries {
+			entries = append(entries, SecretEntry{
+				Key:   e.Key,
+				Value: e.Value,
+			})
+		}
+		res.Entries = &entries
+	}
+
+	return res, nil
+}
+
 func (c *Client) GetGithubAccessToken(ctx context.Context) (string, error) {
 	resp, err := c.api.GetGithubAccessTokenWithResponse(ctx)
 	if err := validateResponse(err, resp, func() bool { return resp.JSON200 != nil }); err != nil {
