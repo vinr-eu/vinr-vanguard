@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/goccy/go-yaml"
 	"vinr.eu/vanguard/internal/citadel"
 	"vinr.eu/vanguard/internal/defs/v1"
 	"vinr.eu/vanguard/internal/errs"
@@ -47,7 +48,7 @@ func (s *Store) Load(ctx context.Context, rootPath string) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() || !strings.HasSuffix(d.Name(), ".json") {
+		if d.IsDir() || !(strings.HasSuffix(d.Name(), ".json") || strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
 			return nil
 		}
 		return s.loadFile(path)
@@ -115,7 +116,7 @@ func (s *Store) loadImport(path string) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() || !strings.HasSuffix(d.Name(), ".json") {
+		if d.IsDir() || !(strings.HasSuffix(d.Name(), ".json") || strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
 			return nil
 		}
 		return s.loadFile(p)
@@ -189,18 +190,22 @@ func (s *Store) expandVariable(ctx context.Context, v Variable) []Variable {
 }
 
 func decode(data []byte) (any, error) {
-	var meta struct {
-		Kind       string `json:"kind"`
-		APIVersion string `json:"apiVersion"`
-	}
-	if err := json.Unmarshal(data, &meta); err != nil {
+	jsonData, err := yaml.YAMLToJSON(data)
+	if err != nil {
 		return nil, errs.Wrap(ErrDecodeFailed, err)
 	}
-	switch meta.APIVersion {
+	var meta struct {
+		Kind       string `json:"kind"`
+		DefVersion string `json:"defVersion"`
+	}
+	if err := json.Unmarshal(jsonData, &meta); err != nil {
+		return nil, errs.Wrap(ErrDecodeFailed, err)
+	}
+	switch meta.DefVersion {
 	case "v1", "":
-		return decodeV1(meta.Kind, data)
+		return decodeV1(meta.Kind, jsonData)
 	default:
-		return errs.WrapMsg(ErrDecodeFailed, "unsupported version "+meta.APIVersion, nil), nil
+		return errs.WrapMsg(ErrDecodeFailed, "unsupported version "+meta.DefVersion, nil), nil
 	}
 }
 

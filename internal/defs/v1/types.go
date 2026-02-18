@@ -2,7 +2,7 @@ package v1
 
 type TypeMeta struct {
 	Kind       string `json:"kind"`
-	APIVersion string `json:"apiVersion"`
+	DefVersion string `json:"defVersion"`
 }
 
 type ObjectMeta struct {
