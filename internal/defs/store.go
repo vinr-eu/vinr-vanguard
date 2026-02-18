@@ -89,7 +89,11 @@ func (s *Store) processEnvironment(ctx context.Context, rootPath string) error {
 			return errs.WrapMsg(ErrImportFailed, imp, err)
 		}
 	}
+
+	nextPort := 3000
 	for _, svc := range s.Services {
+		svc.Port = nextPort
+		nextPort++
 		s.resolveServiceSecrets(ctx, svc)
 	}
 	for name, override := range s.Environment.Overrides {
@@ -121,6 +125,9 @@ func (s *Store) loadImport(path string) error {
 func (s *Store) applyOverride(ctx context.Context, svc *Service, override ServiceOverride) {
 	if override.Branch != nil {
 		svc.Branch = *override.Branch
+	}
+	if override.Port != nil {
+		svc.Port = *override.Port
 	}
 	if override.IngressHost != nil {
 		svc.IngressHost = override.IngressHost

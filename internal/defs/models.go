@@ -11,6 +11,7 @@ type Service struct {
 	GitURL      string
 	Branch      string
 	Path        string
+	Port        int
 	RunScript   string
 	IngressHost *string
 	Variables   []Variable
@@ -30,6 +31,7 @@ type Environment struct {
 
 type ServiceOverride struct {
 	Branch      *string
+	Port        *int
 	IngressHost *string
 	Variables   []Variable
 }

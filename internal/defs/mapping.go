@@ -15,12 +15,18 @@ func mapServiceV1(svc *v1.Service) *Service {
 		path = *svc.Path
 	}
 
+	port := 0
+	if svc.Port != nil {
+		port = *svc.Port
+	}
+
 	return &Service{
 		Name:        svc.Name,
 		Runtime:     RuntimeSpec(svc.Runtime),
 		GitURL:      svc.GitURL,
 		Branch:      branch,
 		Path:        path,
+		Port:        port,
 		RunScript:   svc.RunScript,
 		IngressHost: svc.IngressHost,
 		Variables:   mapVariablesV1(svc.Variables),
@@ -32,6 +38,7 @@ func mapEnvironmentV1(env *v1.Environment) *Environment {
 	for name, o := range env.Overrides {
 		overrides[name] = ServiceOverride{
 			Branch:      o.Branch,
+			Port:        o.Port,
 			IngressHost: o.IngressHost,
 			Variables:   mapVariablesV1(o.Variables),
 		}

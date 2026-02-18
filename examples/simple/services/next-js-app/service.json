@@ -7,5 +7,6 @@
     "version": "24.13.1"
   },
   "gitUrl": "https://github.com/richy-vinr/next-js-app",
+  "port": 3000,
   "runScript": "npm run dev"
 }

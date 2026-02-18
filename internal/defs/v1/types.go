@@ -22,6 +22,7 @@ type Service struct {
 	GitURL      string      `json:"gitURL"`
 	Branch      *string     `json:"branch,omitempty"`
 	Path        *string     `json:"path,omitempty"`
+	Port        *int        `json:"port,omitempty"`
 	RunScript   string      `json:"runScript"`
 	IngressHost *string     `json:"ingressHost,omitempty"`
 	Variables   []Variable  `json:"variables,omitempty"`
@@ -43,6 +44,7 @@ type Environment struct {
 
 type ServiceOverride struct {
 	Branch      *string    `json:"branch,omitempty"`
+	Port        *int       `json:"port,omitempty"`
 	IngressHost *string    `json:"ingressHost,omitempty"`
 	Variables   []Variable `json:"variables,omitempty"`
 }

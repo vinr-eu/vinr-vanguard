@@ -7,5 +7,6 @@
     "version": "25.0.2"
   },
   "gitUrl": "https://github.com/richy-vinr/spring-boot-app",
+  "port": 3002,
   "runScript": "java -jar build/libs/spring-boot-app-0.0.1-SNAPSHOT.jar"
 }

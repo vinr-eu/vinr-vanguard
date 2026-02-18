@@ -120,18 +120,7 @@ func setupReverseProxy(router *gin.Engine, services map[string]*defs.Service) {
 			continue
 		}
 
-		var port string
-		for _, v := range svc.Variables {
-			if v.Name == "PORT" || v.Name == "SERVER_PORT" {
-				port = *v.Value
-				break
-			}
-		}
-
-		if port == "" {
-			slog.Warn("service has IngressHost but no PORT variable", "service", svc.Name)
-			continue
-		}
+		port := fmt.Sprintf("%d", svc.Port)
 
 		target, err := url.Parse("http://localhost:" + port)
 		if err != nil {
