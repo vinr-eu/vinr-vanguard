@@ -26,6 +26,10 @@ jobs:
         run: |
           GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/vanguard-linux-amd64 ./cmd/cli
 
+      - name: Build Linux (ARM64)
+        run: |
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o bin/vanguard-linux-arm64 ./cmd/cli
+
       - name: Build Windows
         run: |
           GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/vanguard-windows-amd64.exe ./cmd/cli
@@ -40,6 +44,7 @@ jobs:
         with:
           files: |
             bin/vanguard-linux-amd64
+            bin/vanguard-linux-arm64
             bin/vanguard-windows-amd64.exe
             bin/vanguard-darwin-arm64
         env:
