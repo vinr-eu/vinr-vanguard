@@ -40,12 +40,13 @@ func NewManager(workspaceDir string, githubTokenProvider source.TokenProvider, a
 func (m *Manager) Boot(ctx context.Context, envDefsGitURL string, envDefsDir string) error {
 	var envPath string
 	if envDefsGitURL != "" && envDefsDir != "" {
-		envPath = filepath.Join(m.workspaceDir, envDefsDir)
+		definitionsDir := filepath.Join(m.workspaceDir, "definitions")
+		envPath = filepath.Join(definitionsDir, envDefsDir)
 		envSrc, err := source.New(envDefsGitURL, "main", m.githubTokenProvider)
 		if err != nil {
 			return errs.WrapMsg(ErrBootFailed, "source init", err)
 		}
-		if err := envSrc.Fetch(ctx, m.workspaceDir); err != nil {
+		if err := envSrc.Fetch(ctx, definitionsDir); err != nil {
 			return errs.WrapMsg(ErrBootFailed, "fetch specs", err)
 		}
 	} else if envDefsDir != "" {
@@ -55,7 +56,7 @@ func (m *Manager) Boot(ctx context.Context, envDefsGitURL string, envDefsDir str
 		return ErrNoSource
 	}
 	if err := m.defsStore.Load(ctx, envPath); err != nil {
-		return errs.WrapMsg(ErrBootFailed, "store load", err)
+		return errs.WrapMsg(ErrBootFailed, "store load: "+envPath, err)
 	}
 	runtimePaths, err := m.ProvisionAll(ctx)
 	if err != nil {

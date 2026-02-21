@@ -1,25 +1,28 @@
 package source
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/google/go-github/v69/github"
+	"golang.org/x/oauth2"
 	"vinr.eu/vanguard/internal/errs"
 )
 
 var (
-	ErrAuthFailed  = errors.New("github: auth token retrieval failed")
-	ErrRepoInvalid = errors.New("github: invalid git repository")
-	ErrSyncFailed  = errors.New("github: sync operation failed")
-	ErrCloneFailed = errors.New("github: clone operation failed")
-	ErrResetFailed = errors.New("github: reset failed")
+	ErrAuthFailed   = errors.New("github: auth token retrieval failed")
+	ErrRepoInvalid  = errors.New("github: invalid repository URL")
+	ErrFetchFailed  = errors.New("github: failed to fetch repository archive")
+	ErrUnpackFailed = errors.New("github: failed to unpack repository")
 )
 
 type GitHubSource struct {
@@ -44,54 +47,143 @@ func (s *GitHubSource) Fetch(ctx context.Context, dest string) error {
 	if err != nil {
 		return errs.Wrap(ErrAuthFailed, err)
 	}
-	auth := &http.BasicAuth{Username: "x-access-token", Password: token}
-	branchRef := plumbing.NewBranchReferenceName(s.branch)
-	if _, err := os.Stat(dest); err == nil {
-		slog.Info("repository exists, syncing...", "path", dest)
-		repo, err := git.PlainOpen(dest)
-		if err != nil {
-			return errs.Wrap(ErrRepoInvalid, err)
-		}
-		w, err := repo.Worktree()
-		if err != nil {
-			return errs.Wrap(ErrSyncFailed, err)
-		}
-		if err := w.Clean(&git.CleanOptions{Dir: true}); err != nil {
-			return errs.WrapMsg(ErrSyncFailed, "clean failed", err)
-		}
-		err = repo.FetchContext(ctx, &git.FetchOptions{
-			Auth:     auth,
-			Progress: io.Discard,
-			RefSpecs: []config.RefSpec{"+refs/heads/*:refs/remotes/origin/*"},
-			Force:    true,
-		})
-		if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
-			return errs.Wrap(ErrSyncFailed, err)
-		}
-		if err := w.Checkout(&git.CheckoutOptions{Branch: branchRef, Force: true}); err != nil {
-			return errs.WrapMsg(ErrSyncFailed, "checkout failed", err)
-		}
-		remoteRef := plumbing.NewRemoteReferenceName("origin", s.branch)
-		remoteHash, err := repo.ResolveRevision(plumbing.Revision(remoteRef))
-		if err != nil {
-			return errs.WrapMsg(ErrSyncFailed, "resolve remote failed", err)
-		}
-		if err := w.Reset(&git.ResetOptions{Mode: git.HardReset, Commit: *remoteHash}); err != nil {
-			return errs.Wrap(ErrResetFailed, err)
-		}
-		return nil
-	}
-	slog.Info("cloning new repository", "url", s.repoURL, "branch", s.branch)
-	_, err = git.PlainCloneContext(ctx, dest, false, &git.CloneOptions{
-		URL:           s.repoURL,
-		Auth:          auth,
-		ReferenceName: branchRef,
-		SingleBranch:  true,
-		Depth:         1,
-		Progress:      io.Discard,
-	})
+
+	owner, repo, err := s.parseRepoURL()
 	if err != nil {
-		return errs.Wrap(ErrCloneFailed, err)
+		return errs.Wrap(ErrRepoInvalid, err)
+	}
+
+	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
+	tc := oauth2.NewClient(ctx, ts)
+	client := github.NewClient(tc)
+
+	opt := &github.RepositoryContentGetOptions{Ref: s.branch}
+	url, _, err := client.Repositories.GetArchiveLink(ctx, owner, repo, github.Tarball, opt, 3)
+	if err != nil {
+		return errs.Wrap(ErrFetchFailed, err)
+	}
+
+	slog.Info("downloading repository archive", "owner", owner, "repo", repo, "branch", s.branch)
+	resp, err := tc.Get(url.String())
+	if err != nil {
+		return errs.Wrap(ErrFetchFailed, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return errs.Wrap(ErrFetchFailed, fmt.Errorf("unexpected status: %s", resp.Status))
+	}
+
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		return errs.Wrap(ErrUnpackFailed, err)
+	}
+
+	if err := s.unpackTarball(resp.Body, dest); err != nil {
+		return errs.Wrap(ErrUnpackFailed, err)
+	}
+
+	// For debugging purposes, let's log the contents of the destination directory
+	if entries, err := os.ReadDir(dest); err == nil {
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		slog.Info("unpacked repository", "dest", dest, "entries", names)
+	}
+
+	return nil
+}
+
+func (s *GitHubSource) parseRepoURL() (string, string, error) {
+	// Expected format: https://github.com/owner/repo or github.com/owner/repo
+	trimmed := strings.TrimPrefix(s.repoURL, "https://")
+	trimmed = strings.TrimPrefix(trimmed, "http://")
+	trimmed = strings.TrimSuffix(trimmed, ".git")
+	parts := strings.Split(trimmed, "/")
+	if len(parts) < 3 {
+		return "", "", fmt.Errorf("invalid url: %s", s.repoURL)
+	}
+
+	// find GitHub.com part
+	for i, p := range parts {
+		if p == "github.com" && i+2 < len(parts) {
+			return parts[i+1], parts[i+2], nil
+		}
+	}
+
+	return "", "", fmt.Errorf("could not find owner/repo in: %s", s.repoURL)
+}
+
+func (s *GitHubSource) unpackTarball(r io.Reader, dest string) error {
+	gzr, err := gzip.NewReader(r)
+	if err != nil {
+		return err
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+	var prefix string
+
+	for {
+		header, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		// Skip metadata and global extended headers
+		if header.Typeflag == tar.TypeXGlobalHeader || header.Typeflag == tar.TypeXHeader {
+			continue
+		}
+
+		// The first entry in a GitHub tarball is the root directory
+		if prefix == "" {
+			prefix = header.Name
+			// Ensure prefix ends with / for correct stripping
+			if !strings.HasSuffix(prefix, "/") {
+				prefix += "/"
+			}
+			slog.Info("detected tarball prefix", "prefix", prefix)
+			continue
+		}
+
+		// Strip the prefix (root directory)
+		name := strings.TrimPrefix(header.Name, prefix)
+		if name == "" {
+			continue
+		}
+
+		target := filepath.Join(dest, name)
+		slog.Info("unpacking file", "header", header.Name, "target", target)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+				return err
+			}
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(f, tr); err != nil {
+				f.Close()
+				return err
+			}
+			f.Close()
+		case tar.TypeSymlink:
+			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+				return err
+			}
+			if err := os.Symlink(header.Linkname, target); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
