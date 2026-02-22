@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"path/filepath"
 
+	"vinr.eu/vanguard/internal/aws"
 	"vinr.eu/vanguard/internal/defs"
 	"vinr.eu/vanguard/internal/deployment"
 	"vinr.eu/vanguard/internal/errs"
@@ -22,18 +23,20 @@ var (
 )
 
 type Manager struct {
-	workspaceDir        string
-	githubTokenProvider source.TokenProvider
-	defsStore           *defs.Store
-	activeDeployments   map[string]deployment.Deployment
+	workspaceDir         string
+	defsStore            *defs.Store
+	activeDeployments    map[string]deployment.Deployment
+	tokenProvider        source.TokenProvider
+	secretsManagerClient *aws.SecretsManagerClient
 }
 
-func NewManager(workspaceDir string, githubTokenProvider source.TokenProvider, awsSecretProvider defs.SecretProvider) *Manager {
+func NewManager(workspaceDir string, tp source.TokenProvider, smc *aws.SecretsManagerClient) *Manager {
 	return &Manager{
-		workspaceDir:        workspaceDir,
-		githubTokenProvider: githubTokenProvider,
-		defsStore:           defs.NewStore(awsSecretProvider),
-		activeDeployments:   make(map[string]deployment.Deployment),
+		workspaceDir:         workspaceDir,
+		defsStore:            defs.NewStore().WithSecretsManager(smc),
+		activeDeployments:    make(map[string]deployment.Deployment),
+		tokenProvider:        tp,
+		secretsManagerClient: smc,
 	}
 }
 
@@ -42,7 +45,7 @@ func (m *Manager) Boot(ctx context.Context, envDefsGitURL string, envDefsDir str
 	if envDefsGitURL != "" && envDefsDir != "" {
 		definitionsDir := filepath.Join(m.workspaceDir, "definitions")
 		envPath = filepath.Join(definitionsDir, envDefsDir)
-		envSrc, err := source.New(envDefsGitURL, "main", m.githubTokenProvider)
+		envSrc, err := source.New(envDefsGitURL, "main", m.tokenProvider)
 		if err != nil {
 			return errs.WrapMsgErr(ErrBootFailed, "source init", err)
 		}
@@ -114,7 +117,7 @@ func (m *Manager) deployService(ctx context.Context, svc *defs.Service, binDir s
 		return errs.WrapMsg(ErrDeployFailed, "no git url: "+svc.Name)
 	}
 	repoPath := filepath.Join(m.workspaceDir, "services", svc.Name)
-	src, err := source.New(svc.GitURL, svc.Branch, m.githubTokenProvider)
+	src, err := source.New(svc.GitURL, svc.Branch, m.tokenProvider)
 	if err != nil {
 		return errs.WrapMsgErr(ErrDeployFailed, "source init: "+svc.Name, err)
 	}

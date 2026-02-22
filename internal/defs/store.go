@@ -12,35 +12,41 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
-	"vinr.eu/vanguard/internal/citadel"
+	"vinr.eu/vanguard/internal/aws"
 	"vinr.eu/vanguard/internal/defs/v1"
 	"vinr.eu/vanguard/internal/errs"
 )
 
 var (
-	ErrLoadFailed     = errors.New("defs: load failed")
-	ErrReadFailed     = errors.New("defs: read failed")
-	ErrDecodeFailed   = errors.New("defs: decode failed")
-	ErrNoEnvironment  = errors.New("defs: missing environment")
-	ErrDupEnvironment = errors.New("defs: duplicate environment")
-	ErrImportFailed   = errors.New("defs: import failed")
+	ErrLoadFailed            = errors.New("defs: load failed")
+	ErrReadFailed            = errors.New("defs: read failed")
+	ErrDecodeFailed          = errors.New("defs: decode failed")
+	ErrNoEnvironment         = errors.New("defs: missing environment")
+	ErrDupEnvironment        = errors.New("defs: duplicate environment")
+	ErrImportFailed          = errors.New("defs: import failed")
+	ErrResolveVariableFailed = errors.New("defs: resolve variable failed")
 )
 
 const AwsSecretPrefix = "aws/secrets/"
 
-type SecretProvider func(ctx context.Context, id string) (*citadel.SecretResponse, error)
-
 type Store struct {
-	Environment    *Environment
-	Services       map[string]*Service
-	fetchAwsSecret SecretProvider
+	Environment          *Environment
+	Services             map[string]*Service
+	fetchSecret          func(ctx context.Context, secretID string) (string, error)
+	secretsManagerClient *aws.SecretsManagerClient
 }
 
-func NewStore(awsSecretProvider SecretProvider) *Store {
-	return &Store{
-		Services:       make(map[string]*Service),
-		fetchAwsSecret: awsSecretProvider,
+func NewStore() *Store {
+	s := &Store{
+		Services: make(map[string]*Service),
 	}
+	s.fetchSecret = s.fetchAwsSecret
+	return s
+}
+
+func (s *Store) WithSecretsManager(client *aws.SecretsManagerClient) *Store {
+	s.secretsManagerClient = client
+	return s
 }
 
 func (s *Store) Load(ctx context.Context, rootPath string) error {
@@ -90,12 +96,13 @@ func (s *Store) processEnvironment(ctx context.Context, rootPath string) error {
 			return errs.WrapMsgErr(ErrImportFailed, imp, err)
 		}
 	}
-
 	nextPort := 3000
 	for _, svc := range s.Services {
 		svc.Port = nextPort
 		nextPort++
-		s.resolveServiceSecrets(ctx, svc)
+		if err := s.resolveServiceSecrets(ctx, svc); err != nil {
+			return err
+		}
 	}
 	for name, override := range s.Environment.Overrides {
 		svc, ok := s.Services[name]
@@ -103,7 +110,9 @@ func (s *Store) processEnvironment(ctx context.Context, rootPath string) error {
 			slog.Warn("skipping override: service not found", "service", name)
 			continue
 		}
-		s.applyOverride(ctx, svc, override)
+		if err := s.applyOverride(ctx, svc, override); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -123,7 +132,7 @@ func (s *Store) loadImport(path string) error {
 	})
 }
 
-func (s *Store) applyOverride(ctx context.Context, svc *Service, override ServiceOverride) {
+func (s *Store) applyOverride(ctx context.Context, svc *Service, override ServiceOverride) error {
 	if override.Branch != nil {
 		svc.Branch = *override.Branch
 	}
@@ -134,59 +143,68 @@ func (s *Store) applyOverride(ctx context.Context, svc *Service, override Servic
 		svc.IngressHost = override.IngressHost
 	}
 	for _, v := range override.Variables {
-		expandedVars := s.expandVariable(ctx, v)
+		expandedVars, err := s.resolveVariable(ctx, v)
+		if err != nil {
+			return err
+		}
 		for _, ev := range expandedVars {
 			updateOrAppendVariable(svc, ev)
 		}
 	}
+	return nil
 }
 
-func (s *Store) resolveServiceSecrets(ctx context.Context, svc *Service) {
+func (s *Store) resolveServiceSecrets(ctx context.Context, svc *Service) error {
 	var finalVars []Variable
 	for _, v := range svc.Variables {
-		finalVars = append(finalVars, s.expandVariable(ctx, v)...)
+		expanded, err := s.resolveVariable(ctx, v)
+		if err != nil {
+			return err
+		}
+		finalVars = append(finalVars, expanded...)
 	}
 	svc.Variables = finalVars
+	return nil
 }
 
-func (s *Store) expandVariable(ctx context.Context, v Variable) []Variable {
-	if v.Value != nil {
-		return []Variable{v}
-	}
-	if v.Ref == nil {
-		return []Variable{v}
+func (s *Store) resolveVariable(ctx context.Context, v Variable) ([]Variable, error) {
+	if v.Value != nil || v.Ref == nil {
+		return []Variable{v}, nil
 	}
 	if !strings.HasPrefix(*v.Ref, AwsSecretPrefix) {
-		return []Variable{v}
+		return []Variable{v}, nil
 	}
 	secretID := strings.TrimPrefix(*v.Ref, AwsSecretPrefix)
-	resp, err := s.fetchAwsSecret(ctx, secretID)
+	secretValue, err := s.fetchSecret(ctx, secretID)
 	if err != nil {
-		slog.Error("failed to fetch secret", "id", secretID, "error", err)
-		return []Variable{v}
+		return nil, errs.WrapMsgErr(ErrResolveVariableFailed, v.Name, err)
 	}
-	if resp.PlainText != nil {
-		return []Variable{{
-			Name:  v.Name,
-			Value: resp.PlainText,
-		}}
-	}
-	if resp.Entries != nil {
+	var entries map[string]any
+	if err := json.Unmarshal([]byte(secretValue), &entries); err == nil {
 		var expanded []Variable
 		prefix := strings.ToUpper(v.Name)
-		for _, entry := range *resp.Entries {
-			if entry.Key != nil && entry.Value != nil {
-				suffix := strings.ToUpper(*entry.Key)
-				newName := fmt.Sprintf("%s_%s", prefix, suffix)
-				expanded = append(expanded, Variable{
-					Name:  newName,
-					Value: entry.Value,
-				})
-			}
+		for key, value := range entries {
+			suffix := strings.ToUpper(key)
+			newName := fmt.Sprintf("%s_%s", prefix, suffix)
+			val := fmt.Sprintf("%v", value)
+			expanded = append(expanded, Variable{
+				Name:  newName,
+				Value: &val,
+			})
 		}
-		return expanded
+		return expanded, nil
 	}
-	return []Variable{v}
+	return []Variable{{
+		Name:  v.Name,
+		Value: &secretValue,
+	}}, nil
+}
+
+func (s *Store) fetchAwsSecret(ctx context.Context, secretID string) (string, error) {
+	if s.secretsManagerClient == nil {
+		return "", fmt.Errorf("aws secrets manager client not initialized")
+	}
+	return s.secretsManagerClient.GetSecret(ctx, secretID)
 }
 
 func decode(data []byte) (any, error) {

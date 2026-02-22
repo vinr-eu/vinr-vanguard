@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -19,22 +17,6 @@ type Server struct{}
 
 func NewServer() Server {
 	return Server{}
-}
-
-func (s Server) GetAwsSecretsId(c *gin.Context, id string) {
-	envKey := fmt.Sprintf("SECRET_%s", strings.ToUpper(strings.ReplaceAll(id, "-", "_")))
-	val, exists := os.LookupEnv(envKey)
-	if !exists {
-		errResp := ErrorResponse{
-			Code:    http.StatusNotFound,
-			Message: fmt.Sprintf("Secret not found. Expected environment variable: %s", envKey),
-		}
-		c.JSON(http.StatusNotFound, errResp)
-	}
-	resp := GetAwsSecretResponse{
-		PlainText: &val,
-	}
-	c.JSON(http.StatusOK, resp)
 }
 
 func (s Server) GetPing(c *gin.Context) {
@@ -48,7 +30,7 @@ func (s Server) GetPing(c *gin.Context) {
 }
 
 func (s Server) GetGithubAccessToken(c *gin.Context) {
-	accessToken := os.Getenv("GITHUB_ACCESS_TOKEN")
+	accessToken := os.Getenv("GITHUB_TOKEN")
 	resp := GetGitHubAccessTokenResponse{
 		AccessToken: accessToken,
 	}

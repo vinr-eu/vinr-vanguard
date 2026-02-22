@@ -26,24 +26,24 @@ var (
 )
 
 type GitHubSource struct {
-	repoURL          string
-	branch           string
-	fetchGitHubToken TokenProvider
+	repoURL       string
+	branch        string
+	tokenProvider TokenProvider
 }
 
-func NewGitHubSource(repoURL, branch string, githubTokenProvider TokenProvider) *GitHubSource {
+func NewGitHubSource(repoURL, branch string, tp TokenProvider) *GitHubSource {
 	if branch == "" {
 		branch = "main"
 	}
 	return &GitHubSource{
-		repoURL:          repoURL,
-		branch:           branch,
-		fetchGitHubToken: githubTokenProvider,
+		repoURL:       repoURL,
+		branch:        branch,
+		tokenProvider: tp,
 	}
 }
 
 func (s *GitHubSource) Fetch(ctx context.Context, dest string) error {
-	token, err := s.fetchGitHubToken(ctx)
+	token, err := s.tokenProvider(ctx)
 	if err != nil {
 		return errs.Wrap(ErrAuthFailed, err)
 	}
@@ -69,20 +69,15 @@ func (s *GitHubSource) Fetch(ctx context.Context, dest string) error {
 		return errs.Wrap(ErrFetchFailed, err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
 		return errs.Wrap(ErrFetchFailed, fmt.Errorf("unexpected status: %s", resp.Status))
 	}
-
 	if err := os.MkdirAll(dest, 0755); err != nil {
 		return errs.Wrap(ErrUnpackFailed, err)
 	}
-
 	if err := s.unpackTarball(resp.Body, dest); err != nil {
 		return errs.Wrap(ErrUnpackFailed, err)
 	}
-
-	// For debugging purposes, let's log the contents of the destination directory
 	if entries, err := os.ReadDir(dest); err == nil {
 		var names []string
 		for _, e := range entries {
@@ -95,22 +90,17 @@ func (s *GitHubSource) Fetch(ctx context.Context, dest string) error {
 }
 
 func (s *GitHubSource) parseRepoURL() (string, string, error) {
-	// Expected format: https://github.com/owner/repo or github.com/owner/repo
 	trimmed := strings.TrimPrefix(s.repoURL, "https://")
-	trimmed = strings.TrimPrefix(trimmed, "http://")
 	trimmed = strings.TrimSuffix(trimmed, ".git")
 	parts := strings.Split(trimmed, "/")
 	if len(parts) < 3 {
 		return "", "", fmt.Errorf("invalid url: %s", s.repoURL)
 	}
-
-	// find GitHub.com part
 	for i, p := range parts {
 		if p == "github.com" && i+2 < len(parts) {
 			return parts[i+1], parts[i+2], nil
 		}
 	}
-
 	return "", "", fmt.Errorf("could not find owner/repo in: %s", s.repoURL)
 }
 
@@ -120,10 +110,8 @@ func (s *GitHubSource) unpackTarball(r io.Reader, dest string) error {
 		return err
 	}
 	defer gzr.Close()
-
 	tr := tar.NewReader(gzr)
 	var prefix string
-
 	for {
 		header, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -132,16 +120,11 @@ func (s *GitHubSource) unpackTarball(r io.Reader, dest string) error {
 		if err != nil {
 			return err
 		}
-
-		// Skip metadata and global extended headers
 		if header.Typeflag == tar.TypeXGlobalHeader || header.Typeflag == tar.TypeXHeader {
 			continue
 		}
-
-		// The first entry in a GitHub tarball is the root directory
 		if prefix == "" {
 			prefix = header.Name
-			// Ensure prefix ends with / for correct stripping
 			if !strings.HasSuffix(prefix, "/") {
 				prefix += "/"
 			}

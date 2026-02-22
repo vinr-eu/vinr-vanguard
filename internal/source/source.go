@@ -18,10 +18,10 @@ type Source interface {
 	Fetch(ctx context.Context, dest string) error
 }
 
-func New(repoURL, branch string, githubTokenProvider TokenProvider) (Source, error) {
+func New(repoURL, branch string, tp TokenProvider) (Source, error) {
 	switch {
 	case strings.Contains(repoURL, "github.com"):
-		return NewGitHubSource(repoURL, branch, githubTokenProvider), nil
+		return NewGitHubSource(repoURL, branch, tp), nil
 	default:
 		return nil, errs.WrapMsg(ErrUnsupportedProvider, repoURL)
 	}

@@ -10,27 +10,26 @@ import (
 
 var (
 	ErrInvalidMode    = errors.New("config: MODE must be 'local' or 'server'")
-	ErrMissingCitadel = errors.New("config: CITADEL_URL or API_KEY missing for server mode")
 	ErrMissingEnvDefs = errors.New("config: ENV_DEFS configuration incomplete")
 )
 
 type Config struct {
 	Mode          string
 	WorkspaceDir  string
-	CitadelURL    string
-	CitadelAPIKey string
 	EnvDefsGitURL string
 	EnvDefsDir    string
+	CitadelURL    string
+	CitadelAPIKey string
 }
 
 func Load() (*Config, error) {
 	cfg := &Config{
 		Mode:          getEnv("MODE", "local"),
 		WorkspaceDir:  getEnv("WORKSPACE_DIR", "/tmp"),
-		CitadelURL:    os.Getenv("CITADEL_URL"),
-		CitadelAPIKey: os.Getenv("CITADEL_API_KEY"),
 		EnvDefsGitURL: os.Getenv("ENV_DEFS_GIT_URL"),
 		EnvDefsDir:    os.Getenv("ENV_DEFS_DIR"),
+		CitadelURL:    os.Getenv("CITADEL_URL"),
+		CitadelAPIKey: os.Getenv("CITADEL_API_KEY"),
 	}
 	if err := cfg.validate(); err != nil {
 		return nil, err
@@ -41,16 +40,10 @@ func Load() (*Config, error) {
 func (c *Config) validate() error {
 	switch c.Mode {
 	case "local":
-		if c.CitadelURL == "" {
-			c.CitadelURL = "http://localhost:9080"
-		}
 		if c.EnvDefsGitURL == "" && c.EnvDefsDir == "" {
 			return ErrMissingEnvDefs
 		}
 	case "server":
-		if c.CitadelURL == "" || c.CitadelAPIKey == "" {
-			return ErrMissingCitadel
-		}
 		if c.EnvDefsGitURL == "" {
 			return ErrMissingEnvDefs
 		}
@@ -62,8 +55,8 @@ func (c *Config) validate() error {
 
 func (c *Config) String() string {
 	return fmt.Sprintf(
-		"Mode=%s WorkspaceDir=%s CitadelURL=%s EnvDefsGitURL=%s EnvDefsDir=%s",
-		c.Mode, c.WorkspaceDir, c.CitadelURL, c.EnvDefsGitURL, c.EnvDefsDir,
+		"Mode=%s WorkspaceDir=%s EnvDefsGitURL=%s EnvDefsDir=%s",
+		c.Mode, c.WorkspaceDir, c.EnvDefsGitURL, c.EnvDefsDir,
 	)
 }
 

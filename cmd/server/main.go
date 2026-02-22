@@ -14,10 +14,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"vinr.eu/vanguard/internal/aws"
 	"vinr.eu/vanguard/internal/citadel"
 	"vinr.eu/vanguard/internal/config"
 	"vinr.eu/vanguard/internal/defs"
 	"vinr.eu/vanguard/internal/environment"
+	"vinr.eu/vanguard/internal/source"
 )
 
 func main() {
@@ -30,25 +32,36 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Load Citadel client
-	client, err := citadel.NewClient(
-		cfg.CitadelURL,
-		citadel.WithAPIKey(cfg.CitadelAPIKey),
-		citadel.WithTimeout(5*time.Second),
-	)
-	if err != nil {
-		slog.Error("Failed to init citadel manager", "error", err)
-		os.Exit(1)
-	}
-	githubTokenProvider := func(ctx context.Context) (string, error) {
-		return client.GetGithubAccessToken(ctx)
-	}
-	awsSecretProvider := func(ctx context.Context, id string) (*citadel.SecretResponse, error) {
-		return client.GetAwsSecret(ctx, id)
+	// Create TokenProvider based on mode
+	var githubTokenProvider source.TokenProvider
+	if cfg.Mode == "local" {
+		githubTokenProvider = func(ctx context.Context) (string, error) {
+			return os.Getenv("GITHUB_TOKEN"), nil
+		}
+	} else {
+		// Load Citadel client
+		client, err := citadel.NewClient(
+			cfg.CitadelURL,
+			citadel.WithAPIKey(cfg.CitadelAPIKey),
+			citadel.WithTimeout(5*time.Second),
+		)
+		if err != nil {
+			slog.Error("Failed to init citadel manager", "error", err)
+			os.Exit(1)
+		}
+		githubTokenProvider = client.GetGithubAccessToken
 	}
 
+	// Load AWS configuration and initialize the Secrets Manager client
+	awsCfg, err := aws.LoadServiceConfig(ctx, "SM")
+	if err != nil {
+		slog.Error("Failed to load AWS config", "error", err)
+		os.Exit(1)
+	}
+	smClient := aws.NewSecretsManagerClient(awsCfg)
+
 	// Load environment manager and Boot the environment
-	manager := environment.NewManager(cfg.WorkspaceDir, githubTokenProvider, awsSecretProvider)
+	manager := environment.NewManager(cfg.WorkspaceDir, githubTokenProvider, smClient)
 	if err := manager.Boot(ctx, cfg.EnvDefsGitURL, cfg.EnvDefsDir); err != nil {
 		slog.Error("Failed to boot engine", "error", err)
 		os.Exit(1)
