@@ -45,6 +45,11 @@ func NewOpenJDKDeployment(svc *defs.Service, repoPath, binDir string) *OpenJDKDe
 
 func (d *OpenJDKDeployment) Install(ctx context.Context) error {
 	manager, args := d.detectManager()
+	if d.binDir != "" && manager == "mvn" {
+		if _, err := os.Stat(filepath.Join(d.binDir, "mvn")); err == nil {
+			manager = filepath.Join(d.binDir, "mvn")
+		}
+	}
 	d.logger.Info("building artifact", "manager", manager)
 	cmd := exec.CommandContext(ctx, manager, args...)
 	cmd.Dir = d.execPath

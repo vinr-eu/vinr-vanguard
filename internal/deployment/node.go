@@ -44,10 +44,15 @@ func NewNodeDeployment(svc *defs.Service, repoPath, binDir string) *NodeDeployme
 }
 
 func (d *NodeDeployment) Install(ctx context.Context) error {
+	env := d.buildEnv()
 	manager := d.detectManager()
+	if d.binDir != "" && (manager == "npm" || manager == "yarn" || manager == "pnpm") {
+		manager = filepath.Join(d.binDir, manager)
+	}
 	d.logger.Info("installing dependencies", "manager", manager)
 	cmd := exec.CommandContext(ctx, manager, "install")
 	cmd.Dir = d.execPath
+	cmd.Env = env
 	if err := d.setupPipes(ctx, cmd); err != nil {
 		return errs.Wrap(ErrPipeFailed, err)
 	}
@@ -63,7 +68,13 @@ func (d *NodeDeployment) Start(ctx context.Context) error {
 		return nil
 	}
 	args := strings.Fields(d.svc.RunScript)
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	commandName := args[0]
+	if d.binDir != "" && (commandName == "node" || commandName == "npm" || commandName == "yarn" || commandName == "pnpm") {
+		if _, err := os.Stat(filepath.Join(d.binDir, commandName)); err == nil {
+			commandName = filepath.Join(d.binDir, commandName)
+		}
+	}
+	cmd := exec.CommandContext(ctx, commandName, args[1:]...)
 	cmd.Dir = d.execPath
 	cmd.Env = d.buildEnv()
 	if err := d.setupPipes(ctx, cmd); err != nil {
