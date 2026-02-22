@@ -54,10 +54,10 @@ func (s *Store) Load(ctx context.Context, rootPath string) error {
 		return s.loadFile(path)
 	})
 	if err != nil {
-		return errs.WrapMsg(ErrLoadFailed, "walk failed at "+rootPath, err)
+		return errs.WrapMsgErr(ErrLoadFailed, "walk failed at "+rootPath, err)
 	}
 	if s.Environment == nil {
-		return errs.WrapMsg(ErrNoEnvironment, "checked "+rootPath, nil)
+		return errs.WrapMsg(ErrNoEnvironment, "checked "+rootPath)
 	}
 	return s.processEnvironment(ctx, rootPath)
 }
@@ -65,18 +65,18 @@ func (s *Store) Load(ctx context.Context, rootPath string) error {
 func (s *Store) loadFile(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return errs.WrapMsg(ErrReadFailed, path, err)
+		return errs.WrapMsgErr(ErrReadFailed, path, err)
 	}
 	obj, err := decode(data)
 	if err != nil {
-		return errs.WrapMsg(ErrDecodeFailed, path, err)
+		return errs.WrapMsgErr(ErrDecodeFailed, path, err)
 	}
 	switch o := obj.(type) {
 	case *v1.Service:
 		s.Services[o.Name] = mapServiceV1(o)
 	case *v1.Environment:
 		if s.Environment != nil {
-			return errs.WrapMsg(ErrDupEnvironment, path, nil)
+			return errs.WrapMsg(ErrDupEnvironment, path)
 		}
 		s.Environment = mapEnvironmentV1(o)
 	}
@@ -87,7 +87,7 @@ func (s *Store) processEnvironment(ctx context.Context, rootPath string) error {
 	for _, imp := range s.Environment.Imports {
 		importPath := filepath.Join(rootPath, filepath.Clean(imp))
 		if err := s.loadImport(importPath); err != nil {
-			return errs.WrapMsg(ErrImportFailed, imp, err)
+			return errs.WrapMsgErr(ErrImportFailed, imp, err)
 		}
 	}
 
@@ -110,7 +110,7 @@ func (s *Store) processEnvironment(ctx context.Context, rootPath string) error {
 
 func (s *Store) loadImport(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return errs.WrapMsg(ErrImportFailed, path, err)
+		return errs.WrapMsgErr(ErrImportFailed, path, err)
 	}
 	return filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -205,7 +205,7 @@ func decode(data []byte) (any, error) {
 	case "v1", "":
 		return decodeV1(meta.Kind, jsonData)
 	default:
-		return errs.WrapMsg(ErrDecodeFailed, "unsupported version "+meta.DefVersion, nil), nil
+		return errs.WrapMsg(ErrDecodeFailed, "unsupported version "+meta.DefVersion), nil
 	}
 }
 
@@ -224,7 +224,7 @@ func decodeV1(kind string, data []byte) (any, error) {
 		}
 		return &env, nil
 	default:
-		return nil, errs.WrapMsg(ErrDecodeFailed, "unknown kind "+kind, nil)
+		return nil, errs.WrapMsg(ErrDecodeFailed, "unknown kind "+kind)
 	}
 }
 

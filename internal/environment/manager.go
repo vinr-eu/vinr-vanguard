@@ -44,10 +44,10 @@ func (m *Manager) Boot(ctx context.Context, envDefsGitURL string, envDefsDir str
 		envPath = filepath.Join(definitionsDir, envDefsDir)
 		envSrc, err := source.New(envDefsGitURL, "main", m.githubTokenProvider)
 		if err != nil {
-			return errs.WrapMsg(ErrBootFailed, "source init", err)
+			return errs.WrapMsgErr(ErrBootFailed, "source init", err)
 		}
 		if err := envSrc.Fetch(ctx, definitionsDir); err != nil {
-			return errs.WrapMsg(ErrBootFailed, "fetch specs", err)
+			return errs.WrapMsgErr(ErrBootFailed, "fetch specs", err)
 		}
 	} else if envDefsDir != "" {
 		slog.InfoContext(ctx, "using local env specs", "path", envDefsDir)
@@ -56,7 +56,7 @@ func (m *Manager) Boot(ctx context.Context, envDefsGitURL string, envDefsDir str
 		return ErrNoSource
 	}
 	if err := m.defsStore.Load(ctx, envPath); err != nil {
-		return errs.WrapMsg(ErrBootFailed, "store load: "+envPath, err)
+		return errs.WrapMsgErr(ErrBootFailed, "store load: "+envPath, err)
 	}
 	runtimePaths, err := m.ProvisionAll(ctx)
 	if err != nil {
@@ -84,12 +84,12 @@ func (m *Manager) ProvisionAll(ctx context.Context) (map[string]string, error) {
 	for key, spec := range required {
 		tc, err := toolchain.New(spec.Engine, m.workspaceDir)
 		if err != nil {
-			return nil, errs.WrapMsg(ErrProvisionFailed, key, err)
+			return nil, errs.WrapMsgErr(ErrProvisionFailed, key, err)
 		}
 		slog.InfoContext(ctx, "provisioning toolchain", "spec", key)
 		binDir, err := tc.Provision(ctx, spec.Version)
 		if err != nil {
-			return nil, errs.WrapMsg(ErrProvisionFailed, key, err)
+			return nil, errs.WrapMsgErr(ErrProvisionFailed, key, err)
 		}
 		results[key] = binDir
 	}
@@ -111,25 +111,25 @@ func (m *Manager) Shutdown() {
 
 func (m *Manager) deployService(ctx context.Context, svc *defs.Service, binDir string) error {
 	if svc.GitURL == "" {
-		return errs.WrapMsg(ErrDeployFailed, "no git url: "+svc.Name, nil)
+		return errs.WrapMsg(ErrDeployFailed, "no git url: "+svc.Name)
 	}
 	repoPath := filepath.Join(m.workspaceDir, "services", svc.Name)
 	src, err := source.New(svc.GitURL, svc.Branch, m.githubTokenProvider)
 	if err != nil {
-		return errs.WrapMsg(ErrDeployFailed, "source init: "+svc.Name, err)
+		return errs.WrapMsgErr(ErrDeployFailed, "source init: "+svc.Name, err)
 	}
 	if err := src.Fetch(ctx, repoPath); err != nil {
-		return errs.WrapMsg(ErrDeployFailed, "fetch: "+svc.Name, err)
+		return errs.WrapMsgErr(ErrDeployFailed, "fetch: "+svc.Name, err)
 	}
 	dep, err := deployment.New(svc, repoPath, binDir)
 	if err != nil {
-		return errs.WrapMsg(ErrDeployFailed, "dep init: "+svc.Name, err)
+		return errs.WrapMsgErr(ErrDeployFailed, "dep init: "+svc.Name, err)
 	}
 	if err := dep.Install(ctx); err != nil {
-		return errs.WrapMsg(ErrDeployFailed, "install: "+svc.Name, err)
+		return errs.WrapMsgErr(ErrDeployFailed, "install: "+svc.Name, err)
 	}
 	if err := dep.Start(ctx); err != nil {
-		return errs.WrapMsg(ErrDeployFailed, "start: "+svc.Name, err)
+		return errs.WrapMsgErr(ErrDeployFailed, "start: "+svc.Name, err)
 	}
 	m.activeDeployments[svc.Name] = dep
 	return nil

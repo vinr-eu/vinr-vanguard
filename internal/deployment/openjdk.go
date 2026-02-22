@@ -58,7 +58,7 @@ func (d *OpenJDKDeployment) Install(ctx context.Context) error {
 		return errs.Wrap(ErrJavaPipeFailed, err)
 	}
 	if err := cmd.Run(); err != nil {
-		return errs.WrapMsg(ErrJavaBuildFailed, manager, err)
+		return errs.WrapMsgErr(ErrJavaBuildFailed, manager, err)
 	}
 	return nil
 }

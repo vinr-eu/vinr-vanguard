@@ -38,7 +38,7 @@ func (t *OpenJDKToolchain) Provision(ctx context.Context, version string) (strin
 	tmpDir := installDir + ".tmp"
 	defer os.RemoveAll(tmpDir)
 	if err := t.downloadAndExtract(ctx, version, tmpDir); err != nil {
-		return "", errs.WrapMsg(ErrProvisionFailed, "openjdk:"+version, err)
+		return "", errs.WrapMsgErr(ErrProvisionFailed, "openjdk:"+version, err)
 	}
 	os.RemoveAll(installDir)
 	if err := os.Rename(tmpDir, installDir); err != nil {
@@ -67,7 +67,7 @@ func (t *OpenJDKToolchain) findBinDir(root string) (string, error) {
 			return p, nil
 		}
 	}
-	return "", errs.WrapMsg(ErrProvisionFailed, "java binary not found in "+root, nil)
+	return "", errs.WrapMsg(ErrProvisionFailed, "java binary not found in "+root)
 }
 
 func (t *OpenJDKToolchain) downloadAndExtract(ctx context.Context, version, dest string) (err error) {

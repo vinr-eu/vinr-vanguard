@@ -23,6 +23,6 @@ func New(repoURL, branch string, githubTokenProvider TokenProvider) (Source, err
 	case strings.Contains(repoURL, "github.com"):
 		return NewGitHubSource(repoURL, branch, githubTokenProvider), nil
 	default:
-		return nil, errs.WrapMsg(ErrUnsupportedProvider, repoURL, nil)
+		return nil, errs.WrapMsg(ErrUnsupportedProvider, repoURL)
 	}
 }

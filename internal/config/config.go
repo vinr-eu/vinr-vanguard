@@ -55,7 +55,7 @@ func (c *Config) validate() error {
 			return ErrMissingEnvDefs
 		}
 	default:
-		return errs.WrapMsg(ErrInvalidMode, "got "+c.Mode, nil)
+		return errs.WrapMsg(ErrInvalidMode, "got "+c.Mode)
 	}
 	return nil
 }

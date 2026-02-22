@@ -22,7 +22,7 @@ type Deployment interface {
 
 func New(svc *defs.Service, repoPath, binDir string) (Deployment, error) {
 	if svc == nil {
-		return nil, errs.WrapMsg(ErrInvalidConfig, "service definition is nil", nil)
+		return nil, errs.WrapMsg(ErrInvalidConfig, "service definition is nil")
 	}
 	engine := strings.ToLower(svc.Runtime.Engine)
 	if engine == "" {
@@ -34,6 +34,6 @@ func New(svc *defs.Service, repoPath, binDir string) (Deployment, error) {
 	case "openjdk":
 		return NewOpenJDKDeployment(svc, repoPath, binDir), nil
 	default:
-		return nil, errs.WrapMsg(ErrUnsupportedEngine, engine, nil)
+		return nil, errs.WrapMsg(ErrUnsupportedEngine, engine)
 	}
 }

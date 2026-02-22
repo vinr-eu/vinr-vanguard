@@ -23,6 +23,6 @@ func New(engine string, cacheDir string) (Toolchain, error) {
 	case "openjdk":
 		return NewOpenJDKToolchain(cacheDir), nil
 	default:
-		return nil, errs.WrapMsg(ErrUnsupportedEngine, engine, nil)
+		return nil, errs.WrapMsg(ErrUnsupportedEngine, engine)
 	}
 }

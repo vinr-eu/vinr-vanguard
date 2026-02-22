@@ -43,7 +43,7 @@ func (t *NodeToolchain) Provision(ctx context.Context, version string) (string, 
 	tmpDir := installDir + ".tmp"
 	defer os.RemoveAll(tmpDir)
 	if err := t.downloadAndExtract(ctx, version, tmpDir); err != nil {
-		return "", errs.WrapMsg(ErrProvisionFailed, "node:"+version, err)
+		return "", errs.WrapMsgErr(ErrProvisionFailed, "node:"+version, err)
 	}
 	os.RemoveAll(installDir)
 	if err := os.Rename(tmpDir, installDir); err != nil {

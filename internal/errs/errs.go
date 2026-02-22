@@ -11,7 +11,11 @@ func Wrap(sentinel, err error) error {
 	return fmt.Errorf("%w: %v", sentinel, err)
 }
 
-func WrapMsg(sentinel error, msg string, err error) error {
+func WrapMsg(sentinel error, msg string) error {
+	return fmt.Errorf("%w: %s", sentinel, msg)
+}
+
+func WrapMsgErr(sentinel error, msg string, err error) error {
 	if err == nil {
 		return fmt.Errorf("%w: %s", sentinel, msg)
 	}

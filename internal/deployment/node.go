@@ -57,7 +57,7 @@ func (d *NodeDeployment) Install(ctx context.Context) error {
 		return errs.Wrap(ErrPipeFailed, err)
 	}
 	if err := cmd.Run(); err != nil {
-		return errs.WrapMsg(ErrInstallFailed, manager, err)
+		return errs.WrapMsgErr(ErrInstallFailed, manager, err)
 	}
 	return nil
 }
