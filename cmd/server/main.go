@@ -13,7 +13,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/autotls"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/acme/autocert"
+
 	"vinr.eu/vanguard/internal/aws"
 	"vinr.eu/vanguard/internal/citadel"
 	"vinr.eu/vanguard/internal/config"
@@ -72,24 +75,53 @@ func main() {
 	setupLogging(router)
 	router.Use(gin.Recovery())
 	setupReverseProxy(router, manager.GetServices())
-	srv := &http.Server{
-		Handler: router,
-		Addr:    "0.0.0.0:8080",
-	}
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("Failed to listen", "error", err)
+
+	// Variable to hold the local server for graceful shutdown
+	var localSrv *http.Server
+
+	if cfg.Mode == "local" {
+		localSrv = &http.Server{
+			Handler: router,
+			Addr:    "0.0.0.0:8080",
 		}
-	}()
+		go func() {
+			slog.Info("Starting local HTTP server on :8080")
+			if err := localSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				slog.Error("Failed to listen", "error", err)
+			}
+		}()
+	} else {
+		m := autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist(cfg.Domain),
+			Cache:      autocert.DirCache("/var/www/.cache"),
+		}
+
+		go func() {
+			slog.Info("Starting AutoTLS server on ports 80 and 443", "domain", cfg.Domain)
+			if err := autotls.RunWithManager(router, &m); err != nil {
+				slog.Error("AutoTLS server failed", "error", err)
+			}
+		}()
+	}
+
+	// Wait for the interrupt signal to gracefully shut down the server
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	slog.Info("Shutdown Server ...")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	slog.Info("Shutdown signal received...")
+
+	ctxTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		slog.Error("Failed to shutdown server", "error", err)
+
+	// Shut down the local HTTP server if it was started
+	if localSrv != nil {
+		if err := localSrv.Shutdown(ctxTimeout); err != nil {
+			slog.Error("Failed to shutdown local server", "error", err)
+		}
 	}
+
+	// Shut down the environment manager
 	manager.Shutdown()
 	slog.Info("Server exiting")
 }
