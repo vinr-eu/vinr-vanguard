@@ -91,14 +91,15 @@ func main() {
 			}
 		}()
 	} else {
+		domains := getDomains(manager.GetServices())
 		m := autocert.Manager{
 			Prompt:     autocert.AcceptTOS,
-			HostPolicy: autocert.HostWhitelist(cfg.Domain),
+			HostPolicy: autocert.HostWhitelist(domains...),
 			Cache:      autocert.DirCache("/var/www/.cache"),
 		}
 
 		go func() {
-			slog.Info("Starting AutoTLS server on ports 80 and 443", "domain", cfg.Domain)
+			slog.Info("Starting AutoTLS server on ports 80 and 443", "domains", domains)
 			if err := autotls.RunWithManager(router, &m); err != nil {
 				slog.Error("AutoTLS server failed", "error", err)
 			}
@@ -155,6 +156,17 @@ func setupLogging(router *gin.Engine) {
 			param.ErrorMessage,
 		)
 	}))
+}
+
+func getDomains(services map[string]*defs.Service) []string {
+	domains := make([]string, 0, len(services))
+	for _, svc := range services {
+		if svc.IngressHost == nil {
+			continue
+		}
+		domains = append(domains, *svc.IngressHost)
+	}
+	return domains
 }
 
 func setupReverseProxy(router *gin.Engine, services map[string]*defs.Service) {

@@ -11,7 +11,6 @@ import (
 var (
 	ErrInvalidMode    = errors.New("config: MODE must be 'local' or 'server'")
 	ErrMissingEnvDefs = errors.New("config: ENV_DEFS configuration incomplete")
-	ErrMissingDomain  = errors.New("config: DOMAIN environment variable is required in server mode")
 )
 
 type Config struct {
@@ -21,7 +20,6 @@ type Config struct {
 	EnvDefsDir    string
 	CitadelURL    string
 	CitadelAPIKey string
-	Domain        string
 }
 
 func Load() (*Config, error) {
@@ -32,7 +30,6 @@ func Load() (*Config, error) {
 		EnvDefsDir:    os.Getenv("ENV_DEFS_DIR"),
 		CitadelURL:    os.Getenv("CITADEL_URL"),
 		CitadelAPIKey: os.Getenv("CITADEL_API_KEY"),
-		Domain:        os.Getenv("DOMAIN"),
 	}
 	if err := cfg.validate(); err != nil {
 		return nil, err
@@ -50,9 +47,6 @@ func (c *Config) validate() error {
 		if c.EnvDefsGitURL == "" {
 			return ErrMissingEnvDefs
 		}
-		if c.Domain == "" {
-			return ErrMissingDomain
-		}
 	default:
 		return errs.WrapMsg(ErrInvalidMode, "got "+c.Mode)
 	}
@@ -61,8 +55,8 @@ func (c *Config) validate() error {
 
 func (c *Config) String() string {
 	return fmt.Sprintf(
-		"Mode=%s WorkspaceDir=%s EnvDefsGitURL=%s EnvDefsDir=%s Domain=%s",
-		c.Mode, c.WorkspaceDir, c.EnvDefsGitURL, c.EnvDefsDir, c.Domain,
+		"Mode=%s WorkspaceDir=%s EnvDefsGitURL=%s EnvDefsDir=%s",
+		c.Mode, c.WorkspaceDir, c.EnvDefsGitURL, c.EnvDefsDir,
 	)
 }
 
