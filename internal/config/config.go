@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	ErrInvalidMode    = errors.New("config: MODE must be 'local' or 'server'")
-	ErrMissingEnvDefs = errors.New("config: ENV_DEFS configuration incomplete")
+	ErrInvalidMode        = errors.New("config: MODE must be 'local' or 'server'")
+	ErrMissingEnvDefs     = errors.New("config: ENV_DEFS configuration incomplete")
+	ErrMissingCitadelDefs = errors.New("config: CITADEL configuration incomplete")
 )
 
 type Config struct {
@@ -20,6 +21,7 @@ type Config struct {
 	EnvDefsDir    string
 	CitadelURL    string
 	CitadelAPIKey string
+	CitadelNodeID string
 }
 
 func Load() (*Config, error) {
@@ -30,6 +32,7 @@ func Load() (*Config, error) {
 		EnvDefsDir:    os.Getenv("ENV_DEFS_DIR"),
 		CitadelURL:    os.Getenv("CITADEL_URL"),
 		CitadelAPIKey: os.Getenv("CITADEL_API_KEY"),
+		CitadelNodeID: os.Getenv("CITADEL_NODE_ID"),
 	}
 	if err := cfg.validate(); err != nil {
 		return nil, err
@@ -44,8 +47,8 @@ func (c *Config) validate() error {
 			return ErrMissingEnvDefs
 		}
 	case "server":
-		if c.EnvDefsGitURL == "" {
-			return ErrMissingEnvDefs
+		if c.CitadelNodeID == "" || c.CitadelAPIKey == "" || c.CitadelURL == "" {
+			return ErrMissingCitadelDefs
 		}
 	default:
 		return errs.WrapMsg(ErrInvalidMode, "got "+c.Mode)

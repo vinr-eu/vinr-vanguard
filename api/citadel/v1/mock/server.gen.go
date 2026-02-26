@@ -4,14 +4,35 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/oapi-codegen/runtime"
 )
 
 const (
 	ApiKeyAuthScopes = "ApiKeyAuth.Scopes"
 )
+
+// Defines values for NodeType.
+const (
+	Leader   NodeType = "leader"
+	Soldier  NodeType = "soldier"
+	Vanguard NodeType = "vanguard"
+)
+
+// EnvironmentVariable defines model for EnvironmentVariable.
+type EnvironmentVariable struct {
+	Name string `json:"name"`
+
+	// Ref Reference to an external secret store path.
+	Ref *string `json:"ref,omitempty"`
+
+	// Value Literal string value.
+	Value *string `json:"value,omitempty"`
+}
 
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
@@ -25,8 +46,15 @@ type GetGitHubAccessTokenResponse struct {
 	AccessToken string `json:"accessToken"`
 }
 
-// PingResponse defines model for PingResponse.
-type PingResponse struct {
+// GetNodeConfigResponse defines model for GetNodeConfigResponse.
+type GetNodeConfigResponse struct {
+	// ServiceDeployments A list of all services assigned to this node with their final overridden configurations.
+	ServiceDeployments []ServiceDeployment `json:"serviceDeployments"`
+	Type               NodeType            `json:"type"`
+}
+
+// GetNodePingResponse defines model for GetNodePingResponse.
+type GetNodePingResponse struct {
 	// Status The current health status of Citadel
 	Status string `json:"status"`
 
@@ -37,14 +65,44 @@ type PingResponse struct {
 	Version *string `json:"version,omitempty"`
 }
 
+// NodeType defines model for NodeType.
+type NodeType string
+
+// ServiceDeployment defines model for ServiceDeployment.
+type ServiceDeployment struct {
+	// Branch The git branch derived from environment overrides.
+	Branch     string `json:"branch"`
+	DefVersion string `json:"defVersion"`
+	GitUrl     string `json:"gitUrl"`
+
+	// IngressHost Optional host mapping from environment overrides.
+	IngressHost *string `json:"ingressHost,omitempty"`
+	Kind        string  `json:"kind"`
+	Name        string  `json:"name"`
+
+	// Port The final overridden port number.
+	Port      int     `json:"port"`
+	RunScript *string `json:"runScript,omitempty"`
+	Runtime   struct {
+		Engine  string `json:"engine"`
+		Version string `json:"version"`
+	} `json:"runtime"`
+
+	// Variables Final list of environment variables including secrets.
+	Variables *[]EnvironmentVariable `json:"variables,omitempty"`
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Retrieve a GitHub access token
 	// (GET /github/access-token)
 	GetGithubAccessToken(c *gin.Context)
-	// Check Citadel connectivity
-	// (GET /ping)
-	GetPing(c *gin.Context)
+	// Get node configuration with service deployments
+	// (GET /node/{id}/get-config)
+	GetNodeIdGetConfig(c *gin.Context, id string)
+	// Send ping for the current node
+	// (GET /node/{id}/ping)
+	GetNodeIdPing(c *gin.Context, id string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -71,8 +129,19 @@ func (siw *ServerInterfaceWrapper) GetGithubAccessToken(c *gin.Context) {
 	siw.Handler.GetGithubAccessToken(c)
 }
 
-// GetPing operation middleware
-func (siw *ServerInterfaceWrapper) GetPing(c *gin.Context) {
+// GetNodeIdGetConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetNodeIdGetConfig(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
 
 	c.Set(ApiKeyAuthScopes, []string{})
 
@@ -83,7 +152,33 @@ func (siw *ServerInterfaceWrapper) GetPing(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetPing(c)
+	siw.Handler.GetNodeIdGetConfig(c, id)
+}
+
+// GetNodeIdPing operation middleware
+func (siw *ServerInterfaceWrapper) GetNodeIdPing(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	c.Set(ApiKeyAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetNodeIdPing(c, id)
 }
 
 // GinServerOptions provides options for the Gin server.
@@ -114,5 +209,6 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	}
 
 	router.GET(options.BaseURL+"/github/access-token", wrapper.GetGithubAccessToken)
-	router.GET(options.BaseURL+"/ping", wrapper.GetPing)
+	router.GET(options.BaseURL+"/node/:id/get-config", wrapper.GetNodeIdGetConfig)
+	router.GET(options.BaseURL+"/node/:id/ping", wrapper.GetNodeIdPing)
 }

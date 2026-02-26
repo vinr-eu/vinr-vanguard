@@ -61,6 +61,17 @@ func (m *Manager) Boot(ctx context.Context, envDefsGitURL string, envDefsDir str
 	if err := m.defsStore.Load(ctx, envPath); err != nil {
 		return errs.WrapMsgErr(ErrBootFailed, "store load: "+envPath, err)
 	}
+	return m.Start(ctx)
+}
+
+func (m *Manager) BootWithConfig(ctx context.Context, services []*defs.Service) error {
+	for _, svc := range services {
+		m.defsStore.Services[svc.Name] = svc
+	}
+	return m.Start(ctx)
+}
+
+func (m *Manager) Start(ctx context.Context) error {
 	runtimePaths, err := m.ProvisionAll(ctx)
 	if err != nil {
 		return errs.Wrap(ErrProvisionFailed, err)

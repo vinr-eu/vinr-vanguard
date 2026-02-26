@@ -15,13 +15,44 @@ import (
 
 type Server struct{}
 
-func NewServer() Server {
-	return Server{}
+func (s Server) GetNodeIdGetConfig(c *gin.Context, _ string) {
+	ingressHost := "vinr.local"
+	runScript := "npm run dev"
+	port := "3000"
+	resp := GetNodeConfigResponse{
+		Type: Vanguard,
+		ServiceDeployments: []ServiceDeployment{
+			{
+				Kind:        "service",
+				DefVersion:  "v1",
+				Name:        "next-js-app",
+				GitUrl:      "https://github.com/richy-vinr/next-js-app",
+				Branch:      "main",
+				Port:        3000,
+				IngressHost: &ingressHost,
+				RunScript:   &runScript,
+				Runtime: struct {
+					Engine  string `json:"engine"`
+					Version string `json:"version"`
+				}{
+					Engine:  "node",
+					Version: "24.13.1",
+				},
+				Variables: &[]EnvironmentVariable{
+					{
+						Name:  "PORT",
+						Value: &port,
+					},
+				},
+			},
+		},
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
-func (s Server) GetPing(c *gin.Context) {
+func (s Server) GetNodeIdPing(c *gin.Context, _ string) {
 	version := "1.0.0"
-	resp := PingResponse{
+	resp := GetNodePingResponse{
 		Status:    "ok",
 		Timestamp: time.Now(),
 		Version:   &version,
@@ -35,6 +66,10 @@ func (s Server) GetGithubAccessToken(c *gin.Context) {
 		AccessToken: accessToken,
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+func NewServer() Server {
+	return Server{}
 }
 
 func main() {

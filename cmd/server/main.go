@@ -35,24 +35,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create TokenProvider based on mode
+	// Create TokenProvider and Citadel client if needed
 	var githubTokenProvider source.TokenProvider
+	var citadelClient *citadel.Client
 	if cfg.Mode == "local" {
 		githubTokenProvider = func(ctx context.Context) (string, error) {
 			return os.Getenv("GITHUB_TOKEN"), nil
 		}
 	} else {
 		// Load Citadel client
-		client, err := citadel.NewClient(
+		var err error
+		citadelClient, err = citadel.NewClient(
 			cfg.CitadelURL,
 			citadel.WithAPIKey(cfg.CitadelAPIKey),
+			citadel.WithNodeID(cfg.CitadelNodeID),
 			citadel.WithTimeout(5*time.Second),
 		)
 		if err != nil {
-			slog.Error("Failed to init citadel manager", "error", err)
+			slog.Error("Failed to init citadel client", "error", err)
 			os.Exit(1)
 		}
-		githubTokenProvider = client.GetGithubAccessToken
+		githubTokenProvider = citadelClient.GetGithubAccessToken
 	}
 
 	// Load AWS configuration and initialize the Secrets Manager client
@@ -65,9 +68,26 @@ func main() {
 
 	// Load environment manager and Boot the environment
 	manager := environment.NewManager(cfg.WorkspaceDir, githubTokenProvider, smClient)
-	if err := manager.Boot(ctx, cfg.EnvDefsGitURL, cfg.EnvDefsDir); err != nil {
-		slog.Error("Failed to boot engine", "error", err)
-		os.Exit(1)
+	if cfg.Mode == "local" {
+		if err := manager.Boot(ctx, cfg.EnvDefsGitURL, cfg.EnvDefsDir); err != nil {
+			slog.Error("Failed to boot engine", "error", err)
+			os.Exit(1)
+		}
+	} else {
+		// In server mode, fetch configuration from Citadel
+		if citadelClient == nil {
+			slog.Error("Citadel client is not initialized in server mode")
+			os.Exit(1)
+		}
+		services, err := citadelClient.GetNodeConfig(ctx, cfg.CitadelNodeID)
+		if err != nil {
+			slog.Error("Failed to get node config from citadel", "error", err)
+			os.Exit(1)
+		}
+		if err := manager.BootWithConfig(ctx, services); err != nil {
+			slog.Error("Failed to boot engine with citadel config", "error", err)
+			os.Exit(1)
+		}
 	}
 
 	// Set up the reverse proxy

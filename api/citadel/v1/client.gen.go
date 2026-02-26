@@ -12,11 +12,31 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/oapi-codegen/runtime"
 )
 
 const (
 	ApiKeyAuthScopes = "ApiKeyAuth.Scopes"
 )
+
+// Defines values for NodeType.
+const (
+	Leader   NodeType = "leader"
+	Soldier  NodeType = "soldier"
+	Vanguard NodeType = "vanguard"
+)
+
+// EnvironmentVariable defines model for EnvironmentVariable.
+type EnvironmentVariable struct {
+	Name string `json:"name"`
+
+	// Ref Reference to an external secret store path.
+	Ref *string `json:"ref,omitempty"`
+
+	// Value Literal string value.
+	Value *string `json:"value,omitempty"`
+}
 
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
@@ -30,8 +50,15 @@ type GetGitHubAccessTokenResponse struct {
 	AccessToken string `json:"accessToken"`
 }
 
-// PingResponse defines model for PingResponse.
-type PingResponse struct {
+// GetNodeConfigResponse defines model for GetNodeConfigResponse.
+type GetNodeConfigResponse struct {
+	// ServiceDeployments A list of all services assigned to this node with their final overridden configurations.
+	ServiceDeployments []ServiceDeployment `json:"serviceDeployments"`
+	Type               NodeType            `json:"type"`
+}
+
+// GetNodePingResponse defines model for GetNodePingResponse.
+type GetNodePingResponse struct {
 	// Status The current health status of Citadel
 	Status string `json:"status"`
 
@@ -40,6 +67,33 @@ type PingResponse struct {
 
 	// Version The running version of the Citadel control plane
 	Version *string `json:"version,omitempty"`
+}
+
+// NodeType defines model for NodeType.
+type NodeType string
+
+// ServiceDeployment defines model for ServiceDeployment.
+type ServiceDeployment struct {
+	// Branch The git branch derived from environment overrides.
+	Branch     string `json:"branch"`
+	DefVersion string `json:"defVersion"`
+	GitUrl     string `json:"gitUrl"`
+
+	// IngressHost Optional host mapping from environment overrides.
+	IngressHost *string `json:"ingressHost,omitempty"`
+	Kind        string  `json:"kind"`
+	Name        string  `json:"name"`
+
+	// Port The final overridden port number.
+	Port      int     `json:"port"`
+	RunScript *string `json:"runScript,omitempty"`
+	Runtime   struct {
+		Engine  string `json:"engine"`
+		Version string `json:"version"`
+	} `json:"runtime"`
+
+	// Variables Final list of environment variables including secrets.
+	Variables *[]EnvironmentVariable `json:"variables,omitempty"`
 }
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
@@ -118,8 +172,11 @@ type ClientInterface interface {
 	// GetGithubAccessToken request
 	GetGithubAccessToken(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetPing request
-	GetPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetNodeIdGetConfig request
+	GetNodeIdGetConfig(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetNodeIdPing request
+	GetNodeIdPing(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) GetGithubAccessToken(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -134,8 +191,20 @@ func (c *Client) GetGithubAccessToken(ctx context.Context, reqEditors ...Request
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetPingRequest(c.Server)
+func (c *Client) GetNodeIdGetConfig(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNodeIdGetConfigRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetNodeIdPing(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNodeIdPingRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -173,16 +242,57 @@ func NewGetGithubAccessTokenRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewGetPingRequest generates requests for GetPing
-func NewGetPingRequest(server string) (*http.Request, error) {
+// NewGetNodeIdGetConfigRequest generates requests for GetNodeIdGetConfig
+func NewGetNodeIdGetConfigRequest(server string, id string) (*http.Request, error) {
 	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/ping")
+	operationPath := fmt.Sprintf("/node/%s/get-config", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetNodeIdPingRequest generates requests for GetNodeIdPing
+func NewGetNodeIdPingRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/node/%s/ping", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -246,8 +356,11 @@ type ClientWithResponsesInterface interface {
 	// GetGithubAccessTokenWithResponse request
 	GetGithubAccessTokenWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetGithubAccessTokenResponse, error)
 
-	// GetPingWithResponse request
-	GetPingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetPingResponse, error)
+	// GetNodeIdGetConfigWithResponse request
+	GetNodeIdGetConfigWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetNodeIdGetConfigResponse, error)
+
+	// GetNodeIdPingWithResponse request
+	GetNodeIdPingWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetNodeIdPingResponse, error)
 }
 
 type GetGithubAccessTokenResponse struct {
@@ -273,15 +386,15 @@ func (r GetGithubAccessTokenResponse) StatusCode() int {
 	return 0
 }
 
-type GetPingResponse struct {
+type GetNodeIdGetConfigResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *PingResponse
+	JSON200      *GetNodeConfigResponse
 	JSON401      *ErrorResponse
 }
 
 // Status returns HTTPResponse.Status
-func (r GetPingResponse) Status() string {
+func (r GetNodeIdGetConfigResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -289,7 +402,30 @@ func (r GetPingResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetPingResponse) StatusCode() int {
+func (r GetNodeIdGetConfigResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetNodeIdPingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GetNodePingResponse
+	JSON401      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNodeIdPingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNodeIdPingResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -305,13 +441,22 @@ func (c *ClientWithResponses) GetGithubAccessTokenWithResponse(ctx context.Conte
 	return ParseGetGithubAccessTokenResponse(rsp)
 }
 
-// GetPingWithResponse request returning *GetPingResponse
-func (c *ClientWithResponses) GetPingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetPingResponse, error) {
-	rsp, err := c.GetPing(ctx, reqEditors...)
+// GetNodeIdGetConfigWithResponse request returning *GetNodeIdGetConfigResponse
+func (c *ClientWithResponses) GetNodeIdGetConfigWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetNodeIdGetConfigResponse, error) {
+	rsp, err := c.GetNodeIdGetConfig(ctx, id, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetPingResponse(rsp)
+	return ParseGetNodeIdGetConfigResponse(rsp)
+}
+
+// GetNodeIdPingWithResponse request returning *GetNodeIdPingResponse
+func (c *ClientWithResponses) GetNodeIdPingWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetNodeIdPingResponse, error) {
+	rsp, err := c.GetNodeIdPing(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNodeIdPingResponse(rsp)
 }
 
 // ParseGetGithubAccessTokenResponse parses an HTTP response from a GetGithubAccessTokenWithResponse call
@@ -347,22 +492,55 @@ func ParseGetGithubAccessTokenResponse(rsp *http.Response) (*GetGithubAccessToke
 	return response, nil
 }
 
-// ParseGetPingResponse parses an HTTP response from a GetPingWithResponse call
-func ParseGetPingResponse(rsp *http.Response) (*GetPingResponse, error) {
+// ParseGetNodeIdGetConfigResponse parses an HTTP response from a GetNodeIdGetConfigWithResponse call
+func ParseGetNodeIdGetConfigResponse(rsp *http.Response) (*GetNodeIdGetConfigResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetPingResponse{
+	response := &GetNodeIdGetConfigResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest PingResponse
+		var dest GetNodeConfigResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetNodeIdPingResponse parses an HTTP response from a GetNodeIdPingWithResponse call
+func ParseGetNodeIdPingResponse(rsp *http.Response) (*GetNodeIdPingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNodeIdPingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GetNodePingResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

@@ -46,16 +46,71 @@
         }
       }
     },
-    "/ping": {
+    "/node/{id}/get-config": {
       "get": {
-        "summary": "Check Citadel connectivity",
+        "tags": [
+          "Node"
+        ],
+        "summary": "Get node configuration with service deployments",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Unique ID of the node",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful retrieval of the merged configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetNodeConfigResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/node/{id}/ping": {
+      "get": {
+        "tags": [
+          "Node"
+        ],
+        "summary": "Send ping for the current node",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Unique ID of the node sending the ping",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful connectivity check",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PingResponse"
+                  "$ref": "#/components/schemas/GetNodePingResponse"
                 }
               }
             }
@@ -96,7 +151,130 @@
           }
         }
       },
-      "PingResponse": {
+      "GetNodeConfigResponse": {
+        "type": "object",
+        "required": [
+          "type",
+          "serviceDeployments"
+        ],
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/NodeType"
+          },
+          "serviceDeployments": {
+            "type": "array",
+            "description": "A list of all services assigned to this node with their final overridden configurations.",
+            "items": {
+              "$ref": "#/components/schemas/ServiceDeployment"
+            }
+          }
+        }
+      },
+      "NodeType": {
+        "type": "string",
+        "enum": [
+          "leader",
+          "soldier",
+          "vanguard"
+        ],
+        "example": "vanguard"
+      },
+      "ServiceDeployment": {
+        "type": "object",
+        "required": [
+          "kind",
+          "defVersion",
+          "name",
+          "runtime",
+          "gitUrl",
+          "port",
+          "branch"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "example": "Service"
+          },
+          "defVersion": {
+            "type": "string",
+            "example": "v1"
+          },
+          "name": {
+            "type": "string",
+            "example": "spring-boot-app"
+          },
+          "branch": {
+            "type": "string",
+            "description": "The git branch derived from environment overrides.",
+            "example": "main"
+          },
+          "runtime": {
+            "type": "object",
+            "required": [
+              "engine",
+              "version"
+            ],
+            "properties": {
+              "engine": {
+                "type": "string",
+                "example": "openjdk"
+              },
+              "version": {
+                "type": "string",
+                "example": "25.0.2"
+              }
+            }
+          },
+          "gitUrl": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://github.com/richy-vinr/spring-boot-app"
+          },
+          "port": {
+            "type": "integer",
+            "description": "The final overridden port number.",
+            "example": 8080
+          },
+          "ingressHost": {
+            "type": "string",
+            "description": "Optional host mapping from environment overrides.",
+            "example": "spring-boot.vinr.ai"
+          },
+          "runScript": {
+            "type": "string",
+            "example": "java -jar build/libs/spring-boot-app-0.0.1-SNAPSHOT.jar"
+          },
+          "variables": {
+            "type": "array",
+            "description": "Final list of environment variables including secrets.",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentVariable"
+            }
+          }
+        }
+      },
+      "EnvironmentVariable": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "SPRING_MONGODB_URI"
+          },
+          "value": {
+            "type": "string",
+            "description": "Literal string value."
+          },
+          "ref": {
+            "type": "string",
+            "description": "Reference to an external secret store path.",
+            "example": "aws/secrets/local/spring-boot-app/mongo-db-url"
+          }
+        }
+      },
+      "GetNodePingResponse": {
         "type": "object",
         "required": [
           "status",
